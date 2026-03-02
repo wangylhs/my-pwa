@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>My PWA Test</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#111111">
+
+  <!-- iOS niceties (optional) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 24px;
+      line-height: 1.4;
+    }
+    .card {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 20px;
+      border: 1px solid rgba(127,127,127,.35);
+      border-radius: 16px;
+    }
+    h1 { margin-top: 0; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .ok { color: #0a7a2f; }
+    .bad { color: #b00020; }
+    code { padding: 2px 6px; border-radius: 6px; background: rgba(127,127,127,.15); }
+    ul { margin: 10px 0 0 0; padding-left: 18px; }
+    .small { font-size: 0.95rem; opacity: .85; }
+    .pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(127,127,127,.35);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>✅ PWA Test Page</h1>
+    <p class="small">
+      Host this on <code>https://*.github.io</code> (GitHub Pages) to test installability.
+      Make sure <code>manifest.webmanifest</code> + <code>sw.js</code> exist.
+    </p>
+
+    <div class="row" style="margin: 14px 0;">
+      <span class="pill" id="securePill">Checking HTTPS…</span>
+      <span class="pill" id="swPill">Checking Service Worker…</span>
+      <span class="pill" id="manifestPill">Checking Manifest…</span>
+    </div>
+
+    <div class="row" style="margin-top: 8px;">
+      <button id="installBtn" disabled>Install</button>
+      <button id="pingCacheBtn">Test offline cache</button>
+    </div>
+
+    <p id="msg" style="margin-top: 14px;"></p>
+
+    <details style="margin-top: 14px;">
+      <summary>What should I see?</summary>
+      <ul>
+        <li><b>HTTPS</b>: should be OK on GitHub Pages.</li>
+        <li><b>Service Worker</b>: should say registered and controlling the page after a reload.</li>
+        <li><b>Manifest</b>: should be found (DevTools → Application → Manifest).</li>
+        <li><b>Install button</b>: enabled when the browser fires <code>beforeinstallprompt</code> (Chrome/Edge).</li>
+      </ul>
+    </details>
+  </div>
+
+  <script>
+    const securePill = document.getElementById("securePill");
+    const swPill = document.getElementById("swPill");
+    const manifestPill = document.getElementById("manifestPill");
+    const installBtn = document.getElementById("installBtn");
+    const pingCacheBtn = document.getElementById("pingCacheBtn");
+    const msg = document.getElementById("msg");
+
+    function setPill(el, ok, text) {
+      el.textContent = text;
+      el.classList.toggle("ok", !!ok);
+      el.classList.toggle("bad", !ok);
+    }
+
+    function note(text, ok=true) {
+      msg.textContent = text;
+      msg.className = ok ? "ok" : "bad";
+    }
+
+    // HTTPS check (localhost is fine too)
+    const isSecure = location.protocol === "https:" || location.hostname === "localhost";
+    setPill(securePill, isSecure, isSecure ? "HTTPS: OK" : "HTTPS: NOT OK");
+
+    // Manifest fetch check (basic)
+    (async () => {
+      try {
+        const res = await fetch("./manifest.webmanifest", { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        setPill(manifestPill, true, "Manifest: found");
+      } catch (e) {
+        setPill(manifestPill, false, "Manifest: missing");
+      }
+    })();
+
+    // Register service worker
+    (async () => {
+      if (!("serviceWorker" in navigator)) {
+        setPill(swPill, false, "SW: not supported");
+        return;
+      }
+
+      try {
+        const reg = await navigator.serviceWorker.register("./sw.js");
+        setPill(swPill, true, "SW: registered");
+
+        // If SW isn't controlling yet, it usually will after reload
+        if (!navigator.serviceWorker.controller) {
+          note("Service worker registered. Reload once so it can control this page.", true);
+        }
+      } catch (e) {
+        setPill(swPill, false, "SW: registration failed");
+        note("Service worker registration failed. Check ./sw.js exists and has no JS errors.", false);
+      }
+    })();
+
+    // Install prompt wiring (Chrome/Edge on desktop & Android)
+    let deferredPrompt = null;
+
+    window.addEventListener("beforeinstallprompt", (e) => {
+      // Prevent the mini-infobar
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.disabled = false;
+      note("Install prompt available! Click Install.", true);
+    });
+
+    installBtn.addEventListener("click", async () => {
+      if (!deferredPrompt) return;
+
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installBtn.disabled = true;
+
+      if (outcome === "accepted") {
+        note("Installed (or install accepted). 🎉", true);
+      } else {
+        note("Install dismissed.", false);
+      }
+    });
+
+    window.addEventListener("appinstalled", () => {
+      note("App installed event fired. ✅", true);
+      installBtn.disabled = true;
+    });
+
+    // Basic offline cache test: try fetching index.html with cache fallback
+    pingCacheBtn.addEventListener("click", async () => {
+      try {
+        const res = await fetch("./index.html", { cache: "reload" });
+        note("Fetch OK. Now try DevTools → Network → Offline and reload.", true);
+        if (!res.ok) note("Fetch returned " + res.status + ". Still check SW cache rules.", false);
+      } catch (e) {
+        note("Fetch failed. If you are offline, this means the SW cache isn't working yet.", false);
+      }
+    });
+  </script>
+</body>
+</html>
