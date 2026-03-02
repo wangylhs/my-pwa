@@ -3,51 +3,82 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>My PWA Test</title>
+  <title>Timesheet</title>
 
   <!-- PWA -->
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <meta name="theme-color" content="#111111">
-
-  <!-- iOS niceties (optional) -->
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Timesheet">
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <button id="googleSignInBtn">Sign in to Google</button>
+    <button id="syncDownBtn" disabled>Sync down (load)</button>
+    <button id="syncUpBtn" disabled>Sync up (save)</button>
+    <span id="syncStatus"></span>
 
   <style>
     :root { color-scheme: light dark; }
     body {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
       margin: 0;
-      padding: 24px;
-      line-height: 1.4;
+      padding: 18px;
+      line-height: 1.35;
     }
+    .wrap { max-width: 980px; margin: 0 auto; }
     .card {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 20px;
       border: 1px solid rgba(127,127,127,.35);
       border-radius: 16px;
+      padding: 14px;
     }
-    h1 { margin-top: 0; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    button {
+    .topbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    h1 { font-size: 1.25rem; margin: 0; }
+    .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    select, input, button {
+      font: inherit;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(127,127,127,.35);
+      background: transparent;
+    }
+    button { cursor: pointer; }
+    button.primary {
       border: 0;
-      border-radius: 12px;
-      padding: 10px 14px;
+      background: rgba(127,127,127,.18);
       font-weight: 600;
-      cursor: pointer;
     }
-    button:disabled { opacity: .55; cursor: not-allowed; }
-    .ok { color: #0a7a2f; }
-    .bad { color: #b00020; }
-    code { padding: 2px 6px; border-radius: 6px; background: rgba(127,127,127,.15); }
-    ul { margin: 10px 0 0 0; padding-left: 18px; }
-    .small { font-size: 0.95rem; opacity: .85; }
+    .tableWrap { overflow: auto; border-radius: 12px; border: 1px solid rgba(127,127,127,.25); }
+    table { width: 100%; border-collapse: collapse; min-width: 860px; }
+    th, td { padding: 10px 10px; border-bottom: 1px solid rgba(127,127,127,.18); }
+    th { text-align: left; position: sticky; top: 0; background: rgba(20,20,20,.65); backdrop-filter: blur(6px); }
+    td input, td select { width: 100%; box-sizing: border-box; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .muted { opacity: .75; font-size: .95rem; }
+    .footer {
+      display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+      padding-top: 12px;
+      align-items: center;
+    }
+    .totalBox {
+      border: 1px solid rgba(127,127,127,.35);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .hint { font-size: .9rem; opacity: .8; }
     .pill {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 999px;
+      display: inline-block; padding: 4px 10px; border-radius: 999px;
       border: 1px solid rgba(127,127,127,.35);
       font-size: 0.9rem;
     }
@@ -55,133 +86,516 @@
 </head>
 
 <body>
+<div class="wrap">
   <div class="card">
-    <h1>✅ PWA Test Page</h1>
-    <p class="small">
-      Host this on <code>https://*.github.io</code> (GitHub Pages) to test installability.
-      Make sure <code>manifest.webmanifest</code> + <code>sw.js</code> exist.
-    </p>
+    <div class="topbar">
+      <div>
+        <h1>Timesheet</h1>
+        <div class="muted">Saved on this device • Works offline</div>
+      </div>
 
-    <div class="row" style="margin: 14px 0;">
-      <span class="pill" id="securePill">Checking HTTPS…</span>
-      <span class="pill" id="swPill">Checking Service Worker…</span>
-      <span class="pill" id="manifestPill">Checking Manifest…</span>
+      <div class="controls">
+        <span class="pill" id="statusPill">Loading…</span>
+
+        <label class="muted" for="monthSel">Month:</label>
+        <select id="monthSel"></select>
+
+        <button class="primary" id="newMonthBtn" title="Create a new month based on the selected month">New month</button>
+        <button id="exportBtn" title="Export current month as JSON">Export</button>
+        <button id="resetBtn" title="Reset current month data">Reset</button>
+      </div>
     </div>
 
-    <div class="row" style="margin-top: 8px;">
-      <button id="installBtn" disabled>Install</button>
-      <button id="pingCacheBtn">Test offline cache</button>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 120px;">Date</th>
+            <th style="width: 80px;">Day</th>
+            <th style="width: 120px;">Start</th>
+            <th style="width: 120px;">End</th>
+            <th style="width: 140px;">Duty</th>
+            <th style="width: 120px;">Lunch (hrs)</th>
+            <th style="width: 110px; text-align:right;">Hours</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
     </div>
 
-    <p id="msg" style="margin-top: 14px;"></p>
-
-    <details style="margin-top: 14px;">
-      <summary>What should I see?</summary>
-      <ul>
-        <li><b>HTTPS</b>: should be OK on GitHub Pages.</li>
-        <li><b>Service Worker</b>: should say registered and controlling the page after a reload.</li>
-        <li><b>Manifest</b>: should be found (DevTools → Application → Manifest).</li>
-        <li><b>Install button</b>: enabled when the browser fires <code>beforeinstallprompt</code> (Chrome/Edge).</li>
-      </ul>
-    </details>
+    <div class="footer">
+      <div class="hint">
+        Tip: use <b>Start</b>/<b>End</b> time pickers. Hours auto-calculate as <code>End - Start - Lunch</code>.
+      </div>
+      <div class="totalBox" id="totalBox">Total: 0.00</div>
+    </div>
   </div>
+</div>
 
-  <script>
-    const securePill = document.getElementById("securePill");
-    const swPill = document.getElementById("swPill");
-    const manifestPill = document.getElementById("manifestPill");
-    const installBtn = document.getElementById("installBtn");
-    const pingCacheBtn = document.getElementById("pingCacheBtn");
-    const msg = document.getElementById("msg");
+<script>
+  // ======= Storage shape =======
+  // key: "timesheet:v1"
+  // data: { months: { "2025-11": { rows: [...] } }, monthOrder: ["2025-11", ...] }
+  const STORE_KEY = "timesheet:v1";
+  const DUTIES = ["", "Bake", "Kitchen", "Duty", "Other"];
 
-    function setPill(el, ok, text) {
-      el.textContent = text;
-      el.classList.toggle("ok", !!ok);
-      el.classList.toggle("bad", !ok);
-    }
+  const statusPill = document.getElementById("statusPill");
+  const monthSel = document.getElementById("monthSel");
+  const tbody = document.getElementById("tbody");
+  const totalBox = document.getElementById("totalBox");
+  const exportBtn = document.getElementById("exportBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const newMonthBtn = document.getElementById("newMonthBtn");
 
-    function note(text, ok=true) {
-      msg.textContent = text;
-      msg.className = ok ? "ok" : "bad";
-    }
+  const fmt2 = (n) => (Math.round(n * 100) / 100).toFixed(2);
 
-    // HTTPS check (localhost is fine too)
-    const isSecure = location.protocol === "https:" || location.hostname === "localhost";
-    setPill(securePill, isSecure, isSecure ? "HTTPS: OK" : "HTTPS: NOT OK");
+  function setStatus(ok, text) {
+    statusPill.textContent = text;
+    statusPill.style.color = ok ? "#0a7a2f" : "#b00020";
+  }
 
-    // Manifest fetch check (basic)
-    (async () => {
-      try {
-        const res = await fetch("./manifest.webmanifest", { cache: "no-store" });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        setPill(manifestPill, true, "Manifest: found");
-      } catch (e) {
-        setPill(manifestPill, false, "Manifest: missing");
-      }
-    })();
+  function pad2(n){ return String(n).padStart(2,"0"); }
 
-    // Register service worker
-    (async () => {
-      if (!("serviceWorker" in navigator)) {
-        setPill(swPill, false, "SW: not supported");
-        return;
-      }
-
-      try {
-        const reg = await navigator.serviceWorker.register("./sw.js");
-        setPill(swPill, true, "SW: registered");
-
-        // If SW isn't controlling yet, it usually will after reload
-        if (!navigator.serviceWorker.controller) {
-          note("Service worker registered. Reload once so it can control this page.", true);
+    // generates ["05:00","05:15",...,"19:00"]
+    function buildTimeOptions(startHH=5, endHH=19, stepMin=15) {
+    const out = [""];
+    for (let h = startHH; h <= endHH; h++) {
+        for (let m = 0; m < 60; m += stepMin) {
+        if (h === endHH && m > 0) break; // stop at 19:00 exactly
+        out.push(`${pad2(h)}:${pad2(m)}`);
         }
-      } catch (e) {
-        setPill(swPill, false, "SW: registration failed");
-        note("Service worker registration failed. Check ./sw.js exists and has no JS errors.", false);
+    }
+    return out;
+    }
+    const TIME_OPTS = buildTimeOptions(5, 19, 15);
+
+  function loadStore() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  function saveStore(store) {
+    localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  }
+
+  function ymd(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  }
+
+  function monthKeyFromDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    return `${y}-${m}`;
+  }
+
+  function daysInMonth(y, m1to12) {
+    return new Date(y, m1to12, 0).getDate();
+  }
+
+  function weekdayShort(d) {
+    return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+  }
+
+  // time strings "HH:MM" -> minutes
+  function toMinutes(hhmm) {
+    if (!hhmm) return null;
+    const [h, m] = hhmm.split(":").map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    return h * 60 + m;
+  }
+
+  function calcHours(startHHMM, endHHMM, lunchHours) {
+    const s = toMinutes(startHHMM);
+    const e = toMinutes(endHHMM);
+    const lunch = Number(lunchHours || 0);
+    if (s === null || e === null) return 0;
+
+    // same-day by default; if end < start assume overnight shift
+    let diff = e - s;
+    if (diff < 0) diff += 24 * 60;
+
+    const hours = diff / 60 - lunch;
+    return hours > 0 ? hours : 0;
+  }
+
+  function makeBlankMonth(monthKey) {
+    const [yStr, mStr] = monthKey.split("-");
+    const y = Number(yStr);
+    const m = Number(mStr); // 1..12
+    const n = daysInMonth(y, m);
+
+    const rows = [];
+    for (let day = 1; day <= n; day++) {
+      const d = new Date(y, m - 1, day);
+      rows.push({
+        date: ymd(d),              // YYYY-MM-DD
+        day: weekdayShort(d),      // Mon, Tue...
+        start: "",                 // HH:MM
+        end: "",                   // HH:MM
+        duty: "",
+        lunch: "0.5",
+      });
+    }
+    return { rows };
+  }
+
+  function ensureInit() {
+    let store = loadStore();
+    if (!store) {
+      const now = new Date();
+      const mk = monthKeyFromDate(now);
+      store = { months: {}, monthOrder: [] };
+      store.months[mk] = makeBlankMonth(mk);
+      store.monthOrder.push(mk);
+      saveStore(store);
+    }
+    return store;
+  }
+
+  function renderMonthOptions(store, selected) {
+    monthSel.innerHTML = "";
+    for (const mk of store.monthOrder) {
+      const opt = document.createElement("option");
+      opt.value = mk;
+      opt.textContent = mk;
+      if (mk === selected) opt.selected = true;
+      monthSel.appendChild(opt);
+    }
+  }
+
+  function renderTable(store, mk) {
+    const month = store.months[mk];
+    if (!month) return;
+
+    tbody.innerHTML = "";
+
+    month.rows.forEach((row, idx) => {
+      const tr = document.createElement("tr");
+
+      tr.innerHTML = `
+        <td><input type="date" value="${row.date}"></td>
+        <td>${row.day}</td>
+        <td>
+        <select data-start>
+            ${TIME_OPTS.map(t => `<option value="${t}" ${t===row.start?"selected":""}>${t}</option>`).join("")}
+        </select>
+        </td>
+        <td>
+        <select data-end>
+            ${TIME_OPTS.map(t => `<option value="${t}" ${t===row.end?"selected":""}>${t}</option>`).join("")}
+        </select>
+        </td>
+        <td>
+          <select>${DUTIES.map(d => `<option ${d===row.duty?"selected":""}>${d}</option>`).join("")}</select>
+        </td>
+        <td><input type="number" step="0.25" min="0" value="${row.lunch ?? "0"}"></td>
+        <td class="num" data-hours>0.00</td>
+      `;
+
+      const dateEl  = tr.children[0].querySelector("input");
+      const startEl = tr.querySelector("[data-start]");
+      const endEl   = tr.querySelector("[data-end]");
+      const dutyEl  = tr.children[4].querySelector("select");
+      const lunchEl = tr.children[5].querySelector("input");
+      const hoursTd = tr.querySelector("[data-hours]");
+
+      function syncDayFromDate() {
+        const d = new Date(dateEl.value + "T00:00:00");
+        row.day = weekdayShort(d);
+        tr.children[1].textContent = row.day;
       }
-    })();
 
-    // Install prompt wiring (Chrome/Edge on desktop & Android)
-    let deferredPrompt = null;
-
-    window.addEventListener("beforeinstallprompt", (e) => {
-      // Prevent the mini-infobar
-      e.preventDefault();
-      deferredPrompt = e;
-      installBtn.disabled = false;
-      note("Install prompt available! Click Install.", true);
-    });
-
-    installBtn.addEventListener("click", async () => {
-      if (!deferredPrompt) return;
-
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      installBtn.disabled = true;
-
-      if (outcome === "accepted") {
-        note("Installed (or install accepted). 🎉", true);
-      } else {
-        note("Install dismissed.", false);
+      function updateHoursAndSave() {
+        const h = calcHours(row.start, row.end, row.lunch);
+        hoursTd.textContent = fmt2(h);
+        saveStore(store);
+        renderTotal(store, mk);
+        setStatus(true, "Saved");
       }
+
+      // init hours
+      hoursTd.textContent = fmt2(calcHours(row.start, row.end, row.lunch));
+
+      // listeners
+      dateEl.addEventListener("change", () => {
+        row.date = dateEl.value;
+        syncDayFromDate();
+        updateHoursAndSave();
+      });
+
+      startEl.addEventListener("change", () => { row.start = startEl.value; updateHoursAndSave(); });
+      endEl.addEventListener("change", () => { row.end = endEl.value; updateHoursAndSave(); });
+      dutyEl.addEventListener("change", () => { row.duty = dutyEl.value; updateHoursAndSave(); });
+      lunchEl.addEventListener("change", () => { row.lunch = lunchEl.value; updateHoursAndSave(); });
+
+      tbody.appendChild(tr);
     });
 
-    window.addEventListener("appinstalled", () => {
-      note("App installed event fired. ✅", true);
-      installBtn.disabled = true;
-    });
+    renderTotal(store, mk);
+  }
 
-    // Basic offline cache test: try fetching index.html with cache fallback
-    pingCacheBtn.addEventListener("click", async () => {
+  function renderTotal(store, mk) {
+    const month = store.months[mk];
+    let total = 0;
+    for (const r of month.rows) total += calcHours(r.start, r.end, r.lunch);
+    totalBox.textContent = `Total: ${fmt2(total)}`;
+  }
+
+  function addNextMonth(store, baseMk) {
+    const [yStr, mStr] = baseMk.split("-");
+    let y = Number(yStr);
+    let m = Number(mStr); // 1..12
+    m += 1;
+    if (m === 13) { m = 1; y += 1; }
+    const nextMk = `${y}-${String(m).padStart(2,"0")}`;
+
+    if (!store.months[nextMk]) {
+      store.months[nextMk] = makeBlankMonth(nextMk);
+      store.monthOrder.push(nextMk);
+      saveStore(store);
+    }
+    return nextMk;
+  }
+
+  // ======= App boot =======
+  let store = ensureInit();
+  let currentMonth = store.monthOrder[store.monthOrder.length - 1];
+
+  renderMonthOptions(store, currentMonth);
+  renderTable(store, currentMonth);
+  setStatus(true, "Ready");
+
+  monthSel.addEventListener("change", () => {
+    currentMonth = monthSel.value;
+    renderTable(store, currentMonth);
+    setStatus(true, "Ready");
+  });
+
+  newMonthBtn.addEventListener("click", () => {
+    store = ensureInit();
+    currentMonth = addNextMonth(store, currentMonth);
+    renderMonthOptions(store, currentMonth);
+    renderTable(store, currentMonth);
+    setStatus(true, "Created");
+  });
+
+  exportBtn.addEventListener("click", async () => {
+    const data = store.months[currentMonth];
+    const blob = new Blob([JSON.stringify({ month: currentMonth, ...data }, null, 2)], { type: "application/json" });
+    const fileName = `timesheet-${currentMonth}.json`;
+
+    // iOS may not support showSaveFilePicker; use share if possible
+    if (navigator.share) {
       try {
-        const res = await fetch("./index.html", { cache: "reload" });
-        note("Fetch OK. Now try DevTools → Network → Offline and reload.", true);
-        if (!res.ok) note("Fetch returned " + res.status + ". Still check SW cache rules.", false);
-      } catch (e) {
-        note("Fetch failed. If you are offline, this means the SW cache isn't working yet.", false);
-      }
+        await navigator.share({ title: fileName, text: "Timesheet export", files: [new File([blob], fileName, { type: "application/json" })] });
+        setStatus(true, "Exported");
+        return;
+      } catch {}
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus(true, "Exported");
+  });
+
+  resetBtn.addEventListener("click", () => {
+    if (!confirm(`Reset ${currentMonth} data?`)) return;
+    store.months[currentMonth] = makeBlankMonth(currentMonth);
+    saveStore(store);
+    renderTable(store, currentMonth);
+    setStatus(true, "Reset");
+  });
+
+  // Register SW
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch(() => {});
     });
-  </script>
+  }
+
+  // ====== CONFIG ======
+const GOOGLE_CLIENT_ID = "644218233242-sst0d01r547bq1lmuuf3inls19foetet.apps.googleusercontent.com";
+const SPREADSHEET_ID = "1FTzC7-1Eqj7G-y7fiG6Hq8EIk24EwCC_IQIo0qFZglY";
+const SHEET_NAME = "Data"; // <-- set to your tab name exactly
+const SCOPES = "https://www.googleapis.com/auth/spreadsheets"; // read+write
+
+let accessToken = null;
+let tokenClient = null;
+
+const signInBtn = document.getElementById("googleSignInBtn");
+const syncDownBtn = document.getElementById("syncDownBtn");
+const syncUpBtn = document.getElementById("syncUpBtn");
+const syncStatus = document.getElementById("syncStatus");
+
+function setSyncStatus(t) { syncStatus.textContent = t; }
+function setSyncEnabled(enabled) {
+  syncDownBtn.disabled = !enabled;
+  syncUpBtn.disabled = !enabled;
+}
+
+function initGoogleTokenClient() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: SCOPES,
+    callback: (resp) => {
+      accessToken = resp.access_token;
+      setSyncStatus("Signed in ✅");
+      setSyncEnabled(true);
+    },
+  });
+}
+
+window.addEventListener("load", () => {
+  initGoogleTokenClient();
+});
+
+signInBtn.addEventListener("click", () => {
+  setSyncStatus("Signing in…");
+  tokenClient.requestAccessToken({ prompt: "consent" });
+});
+
+// Helper for calling Sheets API
+async function sheetsFetch(path, options = {}) {
+  if (!accessToken) throw new Error("Not signed in");
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/${path}`, {
+    ...options,
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Sheets API error ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+// ====== YOUR APP HOOKS ======
+// Implement these two functions in your app:
+// - getMonthDataForSync(monthKey) -> array of row objects for that month
+// - applyMonthDataFromSync(monthKey, rows) -> update your local storage/table
+
+// Example row object shape:
+// { month:"2026-03", date:"2026-03-01", start:"08:15", end:"14:45", duty:"Kitchen", lunch:"0.5", hours:"5.75" }
+
+function getMonthDataForSync(monthKey) {
+  // TODO: return your local month rows
+  return [];
+}
+
+function applyMonthDataFromSync(monthKey, rows) {
+  // TODO: write rows into local storage + re-render
+}
+
+// ====== SYNC DOWN: load month from sheet ======
+syncDownBtn.addEventListener("click", async () => {
+  try {
+    const monthKey = document.getElementById("monthSel")?.value || ""; // if you have month dropdown
+    setSyncStatus("Loading…");
+
+    const range = encodeURIComponent(`${SHEET_NAME}!A:H`);
+    const data = await sheetsFetch(`values/${range}`);
+    const values = data.values || [];
+
+    // Expect header in row 1
+    const body = values.slice(1);
+    const filtered = body
+      .filter(r => (r[0] || "") === monthKey)
+      .map(r => ({
+        month: r[0] || "",
+        date: r[1] || "",
+        start: r[2] || "",
+        end: r[3] || "",
+        duty: r[4] || "",
+        lunch: r[5] || "",
+        hours: r[6] || "",
+        updatedAt: r[7] || ""
+      }));
+
+    applyMonthDataFromSync(monthKey, filtered);
+    setSyncStatus("Loaded ✅");
+  } catch (e) {
+    setSyncStatus(String(e.message || e));
+  }
+});
+
+// ====== SYNC UP: upsert month rows into sheet ======
+syncUpBtn.addEventListener("click", async () => {
+  try {
+    const monthKey = document.getElementById("monthSel")?.value || "";
+    setSyncStatus("Saving…");
+
+    // 1) Read entire sheet to find existing rows for that month+date
+    const rangeAll = encodeURIComponent(`${SHEET_NAME}!A:H`);
+    const data = await sheetsFetch(`values/${rangeAll}`);
+    const values = data.values || [];
+    const header = values[0] || [];
+    const body = values.slice(1);
+
+    // Map existing row -> sheet row index (1-based in Sheets; header is row 1)
+    const indexByKey = new Map();
+    body.forEach((r, i) => {
+      const m = r[0] || "";
+      const d = r[1] || "";
+      if (m && d) indexByKey.set(`${m}|${d}`, i + 2); // +2 because header row + 1-based
+    });
+
+    // 2) Upsert each local row
+    const localRows = getMonthDataForSync(monthKey);
+    const now = new Date().toISOString();
+
+    for (const row of localRows) {
+      if (!row.date) continue;
+      const key = `${monthKey}|${row.date}`;
+      const sheetRowIndex = indexByKey.get(key);
+
+      const rowValues = [[
+        monthKey,
+        row.date,
+        row.start || "",
+        row.end || "",
+        row.duty || "",
+        row.lunch ?? "",
+        row.hours ?? "",
+        now
+      ]];
+
+      if (sheetRowIndex) {
+        // Update existing row A:H at that row index
+        const updateRange = encodeURIComponent(`${SHEET_NAME}!A${sheetRowIndex}:H${sheetRowIndex}`);
+        await sheetsFetch(`values/${updateRange}?valueInputOption=USER_ENTERED`, {
+          method: "PUT",
+          body: JSON.stringify({ values: rowValues })
+        });
+      } else {
+        // Append new row
+        const appendRange = encodeURIComponent(`${SHEET_NAME}!A:H`);
+        await sheetsFetch(`values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+          method: "POST",
+          body: JSON.stringify({ values: rowValues })
+        });
+      }
+    }
+
+    setSyncStatus("Saved ✅");
+  } catch (e) {
+    setSyncStatus(String(e.message || e));
+  }
+});
+</script>
 </body>
 </html>
