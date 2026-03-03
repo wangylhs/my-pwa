@@ -205,9 +205,33 @@
   }
 
   // time strings "HH:MM" -> minutes
+  function normalizeTimeString(value) {
+    if (value === null || value === undefined) return "";
+    const s = String(value).trim();
+    if (!s) return "";
+
+    const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?$/);
+    if (!m) return s;
+
+    let h = Number(m[1]);
+    const mm = Number(m[2]);
+    const ampm = (m[3] || "").toLowerCase();
+
+    if (!Number.isFinite(h) || !Number.isFinite(mm) || mm < 0 || mm > 59) return s;
+    if (ampm) {
+      if (h < 1 || h > 12) return s;
+      if (ampm === "pm" && h !== 12) h += 12;
+      if (ampm === "am" && h === 12) h = 0;
+    }
+    if (h < 0 || h > 23) return s;
+
+    return `${pad2(h)}:${pad2(mm)}`;
+  }
+
   function toMinutes(hhmm) {
-    if (!hhmm) return null;
-    const [h, m] = hhmm.split(":").map(Number);
+    const normalized = normalizeTimeString(hhmm);
+    if (!normalized) return null;
+    const [h, m] = normalized.split(":").map(Number);
     if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
     return h * 60 + m;
   }
@@ -596,8 +620,8 @@ function applyMonthDataFromSync(monthKey, rows) {
     if (!incoming) return localRow;
     return {
       ...localRow,
-      start: incoming.start || "",
-      end: incoming.end || "",
+      start: normalizeTimeString(incoming.start),
+      end: normalizeTimeString(incoming.end),
       duty: incoming.duty || "",
       lunch: incoming.lunch ?? localRow.lunch ?? "0.5",
       day: weekdayShort(new Date(localRow.date + "T00:00:00"))
@@ -626,8 +650,8 @@ syncDownBtn.addEventListener("click", async () => {
       .map(r => ({
         month: r[0] || "",
         date: r[1] || "",
-        start: r[2] || "",
-        end: r[3] || "",
+        start: normalizeTimeString(r[2]),
+        end: normalizeTimeString(r[3]),
         duty: r[4] || "",
         lunch: r[5] || "",
         hours: r[6] || "",
