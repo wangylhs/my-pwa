@@ -302,6 +302,11 @@
     tbody.innerHTML = "";
 
     month.rows.forEach((row, idx) => {
+      const startNorm = normalizeTimeString(row.start);
+      const endNorm = normalizeTimeString(row.end);
+      if (row.start !== startNorm) row.start = startNorm;
+      if (row.end !== endNorm) row.end = endNorm;
+
       const tr = document.createElement("tr");
 
       tr.innerHTML = `
@@ -309,12 +314,12 @@
         <td>${row.day}</td>
         <td>
         <select data-start>
-            ${TIME_OPTS.map(t => `<option value="${t}" ${t===row.start?"selected":""}>${t}</option>`).join("")}
+            ${TIME_OPTS.map(t => `<option value="${t}">${t}</option>`).join("")}
         </select>
         </td>
         <td>
         <select data-end>
-            ${TIME_OPTS.map(t => `<option value="${t}" ${t===row.end?"selected":""}>${t}</option>`).join("")}
+            ${TIME_OPTS.map(t => `<option value="${t}">${t}</option>`).join("")}
         </select>
         </td>
         <td>
@@ -330,6 +335,24 @@
       const dutyEl  = tr.children[4].querySelector("select");
       const lunchEl = tr.children[5].querySelector("input");
       const hoursTd = tr.querySelector("[data-hours]");
+
+      // Bind values after options exist to avoid template selected edge cases.
+      const normalizedStart = normalizeTimeString(row.start);
+      const normalizedEnd = normalizeTimeString(row.end);
+      if (normalizedStart && !TIME_OPTS.includes(normalizedStart)) {
+        const opt = document.createElement("option");
+        opt.value = normalizedStart;
+        opt.textContent = normalizedStart;
+        startEl.appendChild(opt);
+      }
+      if (normalizedEnd && !TIME_OPTS.includes(normalizedEnd)) {
+        const opt = document.createElement("option");
+        opt.value = normalizedEnd;
+        opt.textContent = normalizedEnd;
+        endEl.appendChild(opt);
+      }
+      startEl.value = normalizedStart;
+      endEl.value = normalizedEnd;
 
       function syncDayFromDate() {
         const d = new Date(dateEl.value + "T00:00:00");
@@ -628,10 +651,10 @@ function applyMonthDataFromSync(monthKey, rows) {
     };
   });
 
-  saveStore(store);
   renderMonthOptions(store, monthKey);
   currentMonth = monthKey;
   renderTable(store, monthKey);
+  saveStore(store);
 }
 
 // ====== SYNC DOWN: load month from sheet ======
