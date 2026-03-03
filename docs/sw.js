@@ -1,4 +1,4 @@
-const CACHE = "timesheet-v1";
+const CACHE = "timesheet-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -24,7 +24,29 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  const isSameOrigin = url.origin === self.location.origin;
+  const isDocument = request.mode === "navigate" || request.destination === "document";
+
+  // Always try network first for app shell HTML so code updates propagate.
+  if (isSameOrigin && isDocument) {
+    event.respondWith(
+      fetch(request)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          return res;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || caches.match("./index.html")))
+    );
+    return;
+  }
+
+  // Static assets: cache-first fallback to network.
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.match(request).then((cached) => cached || fetch(request))
   );
 });

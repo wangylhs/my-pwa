@@ -429,6 +429,7 @@
 const GOOGLE_CLIENT_ID = "644218233242-sst0d01r547bq1lmuuf3inls19foetet.apps.googleusercontent.com";
 const SPREADSHEET_ID = "1FTzC7-1Eqj7G-y7fiG6Hq8EIk24EwCC_IQIo0qFZglY";
 const SHEET_NAME = "Data"; // <-- set to your tab name exactly
+const SHEET_GID = 27394589; // target tab from spreadsheet URL
 const SCOPES = "https://www.googleapis.com/auth/spreadsheets"; // read+write
 const SHEET_HEADER = ["month", "date", "start", "end", "duty", "lunch", "hours", "updatedAt"];
 
@@ -450,27 +451,67 @@ function initGoogleTokenClient() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
     scope: SCOPES,
-    callback: (resp) => {
-      accessToken = resp.access_token;
-      setSyncStatus("Signed in ✅");
-      setSyncEnabled(true);
-    },
+    callback: () => {},
   });
+}
+
+async function requestGoogleAccessToken(prompt = "") {
+  if (!tokenClient) throw new Error("Google auth not initialized");
+  return new Promise((resolve, reject) => {
+    tokenClient.callback = (resp) => {
+      if (resp?.error) {
+        accessToken = null;
+        setSyncEnabled(false);
+        reject(new Error(resp.error));
+        return;
+      }
+      accessToken = resp.access_token;
+      setSyncEnabled(true);
+      resolve(accessToken);
+    };
+    tokenClient.requestAccessToken({ prompt });
+  });
+}
+
+async function trySilentSignIn() {
+  try {
+    await requestGoogleAccessToken("");
+    setSyncStatus("Signed in ✅");
+  } catch {
+    setSyncStatus("Not signed in");
+    setSyncEnabled(false);
+  }
 }
 
 window.addEventListener("load", () => {
   initGoogleTokenClient();
+  setSyncStatus("Checking Google session…");
+  trySilentSignIn();
 });
 
-signInBtn.addEventListener("click", () => {
+signInBtn.addEventListener("click", async () => {
   setSyncStatus("Signing in…");
-  tokenClient.requestAccessToken({ prompt: "consent" });
+  try {
+    await requestGoogleAccessToken("");
+    setSyncStatus("Signed in ✅");
+  } catch {
+    try {
+      await requestGoogleAccessToken("consent");
+      setSyncStatus("Signed in ✅");
+    } catch (e) {
+      setSyncStatus(`Sign-in failed: ${e.message || e}`);
+    }
+  }
 });
 
 // Helper for calling Sheets API
-async function sheetsFetch(path, options = {}) {
-  if (!accessToken) throw new Error("Not signed in");
-  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/${path}`, {
+async function sheetsFetch(path, options = {}, allowRetry = true) {
+  if (!accessToken) {
+    await requestGoogleAccessToken("");
+  }
+  const base = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}`;
+  const url = String(path).startsWith("?") ? `${base}${path}` : `${base}/${path}`;
+  const res = await fetch(url, {
     ...options,
     headers: {
       "Authorization": `Bearer ${accessToken}`,
@@ -478,6 +519,11 @@ async function sheetsFetch(path, options = {}) {
       ...(options.headers || {})
     }
   });
+  if (res.status === 401 && allowRetry) {
+    accessToken = null;
+    await requestGoogleAccessToken("");
+    return sheetsFetch(path, options, false);
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Sheets API error ${res.status}: ${text}`);
@@ -485,19 +531,31 @@ async function sheetsFetch(path, options = {}) {
   return res.json();
 }
 
+function a1Range(sheetName, range) {
+  const escaped = String(sheetName || "").replace(/'/g, "''");
+  return encodeURIComponent(`'${escaped}'!${range}`);
+}
+
 function hasHeaderRow(values) {
   const firstRow = values[0] || [];
   return SHEET_HEADER.every((h, i) => String(firstRow[i] || "").toLowerCase() === h);
 }
 
-async function ensureHeaderRow(values) {
+async function ensureHeaderRow(sheetName, values) {
   if (values.length) return values;
-  const headerRange = encodeURIComponent(`${SHEET_NAME}!A1:H1`);
+  const headerRange = a1Range(sheetName, "A1:H1");
   await sheetsFetch(`values/${headerRange}?valueInputOption=RAW`, {
     method: "PUT",
     body: JSON.stringify({ values: [SHEET_HEADER] })
   });
   return [SHEET_HEADER];
+}
+
+async function getTargetSheetName() {
+  const meta = await sheetsFetch(`?fields=sheets.properties(sheetId,title)`);
+  const sheets = meta?.sheets || [];
+  const byId = sheets.find(s => s?.properties?.sheetId === SHEET_GID)?.properties?.title;
+  return byId || SHEET_NAME;
 }
 
 // ====== YOUR APP HOOKS ======
@@ -557,8 +615,9 @@ syncDownBtn.addEventListener("click", async () => {
   try {
     const monthKey = document.getElementById("monthSel")?.value || ""; // if you have month dropdown
     setSyncStatus("Loading…");
+    const sheetName = await getTargetSheetName();
 
-    const range = encodeURIComponent(`${SHEET_NAME}!A:H`);
+    const range = a1Range(sheetName, "A:H");
     const data = await sheetsFetch(`values/${range}`);
     const values = data.values || [];
     const body = hasHeaderRow(values) ? values.slice(1) : values;
@@ -576,7 +635,7 @@ syncDownBtn.addEventListener("click", async () => {
       }));
 
     applyMonthDataFromSync(monthKey, filtered);
-    setSyncStatus("Loaded ✅");
+    setSyncStatus(`Loaded ✅ (${sheetName})`);
   } catch (e) {
     setSyncStatus(String(e.message || e));
   }
@@ -587,11 +646,12 @@ syncUpBtn.addEventListener("click", async () => {
   try {
     const monthKey = document.getElementById("monthSel")?.value || "";
     setSyncStatus("Saving…");
+    const sheetName = await getTargetSheetName();
 
     // 1) Read entire sheet to find existing rows for that month+date
-    const rangeAll = encodeURIComponent(`${SHEET_NAME}!A:H`);
+    const rangeAll = a1Range(sheetName, "A:H");
     const data = await sheetsFetch(`values/${rangeAll}`);
-    const values = await ensureHeaderRow(data.values || []);
+    const values = await ensureHeaderRow(sheetName, data.values || []);
     const headerExists = hasHeaderRow(values);
     const body = headerExists ? values.slice(1) : values;
 
@@ -630,14 +690,14 @@ syncUpBtn.addEventListener("click", async () => {
 
       if (sheetRowIndex) {
         // Update existing row A:H at that row index
-        const updateRange = encodeURIComponent(`${SHEET_NAME}!A${sheetRowIndex}:H${sheetRowIndex}`);
+        const updateRange = a1Range(sheetName, `A${sheetRowIndex}:H${sheetRowIndex}`);
         await sheetsFetch(`values/${updateRange}?valueInputOption=USER_ENTERED`, {
           method: "PUT",
           body: JSON.stringify({ values: rowValues })
         });
       } else {
         // Append new row
-        const appendRange = encodeURIComponent(`${SHEET_NAME}!A:H`);
+        const appendRange = a1Range(sheetName, "A:H");
         await sheetsFetch(`values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
           method: "POST",
           body: JSON.stringify({ values: rowValues })
@@ -645,7 +705,7 @@ syncUpBtn.addEventListener("click", async () => {
       }
     }
 
-    setSyncStatus(`Saved ✅ (${localRows.length} rows)`);
+    setSyncStatus(`Saved ✅ (${localRows.length} rows to ${sheetName})`);
   } catch (e) {
     setSyncStatus(String(e.message || e));
   }
