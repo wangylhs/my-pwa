@@ -430,6 +430,7 @@ const GOOGLE_CLIENT_ID = "644218233242-sst0d01r547bq1lmuuf3inls19foetet.apps.goo
 const SPREADSHEET_ID = "1FTzC7-1Eqj7G-y7fiG6Hq8EIk24EwCC_IQIo0qFZglY";
 const SHEET_NAME = "Data"; // <-- set to your tab name exactly
 const SCOPES = "https://www.googleapis.com/auth/spreadsheets"; // read+write
+const SHEET_HEADER = ["month", "date", "start", "end", "duty", "lunch", "hours", "updatedAt"];
 
 let accessToken = null;
 let tokenClient = null;
@@ -484,6 +485,21 @@ async function sheetsFetch(path, options = {}) {
   return res.json();
 }
 
+function hasHeaderRow(values) {
+  const firstRow = values[0] || [];
+  return SHEET_HEADER.every((h, i) => String(firstRow[i] || "").toLowerCase() === h);
+}
+
+async function ensureHeaderRow(values) {
+  if (values.length) return values;
+  const headerRange = encodeURIComponent(`${SHEET_NAME}!A1:H1`);
+  await sheetsFetch(`values/${headerRange}?valueInputOption=RAW`, {
+    method: "PUT",
+    body: JSON.stringify({ values: [SHEET_HEADER] })
+  });
+  return [SHEET_HEADER];
+}
+
 // ====== YOUR APP HOOKS ======
 // Implement these two functions in your app:
 // - getMonthDataForSync(monthKey) -> array of row objects for that month
@@ -493,12 +509,47 @@ async function sheetsFetch(path, options = {}) {
 // { month:"2026-03", date:"2026-03-01", start:"08:15", end:"14:45", duty:"Kitchen", lunch:"0.5", hours:"5.75" }
 
 function getMonthDataForSync(monthKey) {
-  // TODO: return your local month rows
-  return [];
+  const month = store.months[monthKey];
+  if (!month?.rows) return [];
+  return month.rows
+    .filter(r => r.date)
+    .map(r => ({
+      month: monthKey,
+      date: r.date || "",
+      start: r.start || "",
+      end: r.end || "",
+      duty: r.duty || "",
+      lunch: r.lunch ?? "",
+      hours: fmt2(calcHours(r.start, r.end, r.lunch))
+    }));
 }
 
 function applyMonthDataFromSync(monthKey, rows) {
-  // TODO: write rows into local storage + re-render
+  if (!store.months[monthKey]) {
+    store.months[monthKey] = makeBlankMonth(monthKey);
+    if (!store.monthOrder.includes(monthKey)) store.monthOrder.push(monthKey);
+  }
+
+  const month = store.months[monthKey];
+  const rowByDate = new Map(rows.map(r => [r.date, r]));
+
+  month.rows = month.rows.map(localRow => {
+    const incoming = rowByDate.get(localRow.date);
+    if (!incoming) return localRow;
+    return {
+      ...localRow,
+      start: incoming.start || "",
+      end: incoming.end || "",
+      duty: incoming.duty || "",
+      lunch: incoming.lunch ?? localRow.lunch ?? "0.5",
+      day: weekdayShort(new Date(localRow.date + "T00:00:00"))
+    };
+  });
+
+  saveStore(store);
+  renderMonthOptions(store, monthKey);
+  currentMonth = monthKey;
+  renderTable(store, monthKey);
 }
 
 // ====== SYNC DOWN: load month from sheet ======
@@ -510,9 +561,7 @@ syncDownBtn.addEventListener("click", async () => {
     const range = encodeURIComponent(`${SHEET_NAME}!A:H`);
     const data = await sheetsFetch(`values/${range}`);
     const values = data.values || [];
-
-    // Expect header in row 1
-    const body = values.slice(1);
+    const body = hasHeaderRow(values) ? values.slice(1) : values;
     const filtered = body
       .filter(r => (r[0] || "") === monthKey)
       .map(r => ({
@@ -542,20 +591,25 @@ syncUpBtn.addEventListener("click", async () => {
     // 1) Read entire sheet to find existing rows for that month+date
     const rangeAll = encodeURIComponent(`${SHEET_NAME}!A:H`);
     const data = await sheetsFetch(`values/${rangeAll}`);
-    const values = data.values || [];
-    const header = values[0] || [];
-    const body = values.slice(1);
+    const values = await ensureHeaderRow(data.values || []);
+    const headerExists = hasHeaderRow(values);
+    const body = headerExists ? values.slice(1) : values;
 
     // Map existing row -> sheet row index (1-based in Sheets; header is row 1)
     const indexByKey = new Map();
+    const firstDataRowIndex = headerExists ? 2 : 1;
     body.forEach((r, i) => {
       const m = r[0] || "";
       const d = r[1] || "";
-      if (m && d) indexByKey.set(`${m}|${d}`, i + 2); // +2 because header row + 1-based
+      if (m && d) indexByKey.set(`${m}|${d}`, i + firstDataRowIndex);
     });
 
     // 2) Upsert each local row
     const localRows = getMonthDataForSync(monthKey);
+    if (!localRows.length) {
+      setSyncStatus("No rows to save for this month");
+      return;
+    }
     const now = new Date().toISOString();
 
     for (const row of localRows) {
@@ -591,7 +645,7 @@ syncUpBtn.addEventListener("click", async () => {
       }
     }
 
-    setSyncStatus("Saved ✅");
+    setSyncStatus(`Saved ✅ (${localRows.length} rows)`);
   } catch (e) {
     setSyncStatus(String(e.message || e));
   }
