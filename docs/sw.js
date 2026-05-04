@@ -1,4 +1,4 @@
-const CACHE = "timesheet-v2";
+const CACHE = "timesheet-v3";
 const ASSETS = [
   "./",
   "./index.html",

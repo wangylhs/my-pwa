@@ -13,13 +13,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Timesheet">
 
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-  <button id="googleSignInBtn">Sign in to Google</button>
-    <button id="syncDownBtn" disabled>Sync down (load)</button>
-    <button id="syncUpBtn" disabled>Sync up (save)</button>
-    <span id="syncStatus"></span>
-
   <style>
     :root { color-scheme: light dark; }
     body {
@@ -82,16 +75,101 @@
       border: 1px solid rgba(127,127,127,.35);
       font-size: 0.9rem;
     }
+
+    /* Login screen */
+    .login-wrap { max-width: 420px; margin: 60px auto; }
+    .login-card { padding: 22px; }
+    .login-card h1 { margin-bottom: 4px; }
+    .login-card .sub { opacity: .75; margin-bottom: 18px; }
+    .field { display: block; margin: 10px 0; }
+    .field label { display: block; font-size: .9rem; opacity: .8; margin-bottom: 4px; }
+    .field input { width: 100%; box-sizing: border-box; padding: 10px 12px; }
+    .row-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .row-actions button { flex: 1; padding: 10px; }
+    .divider {
+      text-align: center; opacity: .6; margin: 18px 0 10px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .divider::before, .divider::after {
+      content: ""; flex: 1; height: 1px; background: rgba(127,127,127,.3);
+    }
+    .btn-google {
+      width: 100%; padding: 10px; display: flex; gap: 10px; justify-content: center; align-items: center;
+    }
+    .btn-google svg { width: 18px; height: 18px; }
+    .err {
+      color: #d23a3a; font-size: .9rem; min-height: 1.2em; margin-top: 10px;
+    }
+    .info-banner {
+      border: 1px solid rgba(127,127,127,.3);
+      background: rgba(127,127,127,.08);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: .9rem;
+      margin: 14px 0 4px;
+      line-height: 1.4;
+    }
+    .user-chip {
+      display: inline-flex; gap: 8px; align-items: center;
+      font-size: .9rem; opacity: .85;
+    }
+    .hidden { display: none !important; }
   </style>
 </head>
 
 <body>
-<div class="wrap">
+
+<!-- ================= LOGIN SCREEN ================= -->
+<div class="wrap login-wrap hidden" id="loginScreen">
+  <div class="card login-card">
+    <h1>Timesheet</h1>
+    <div class="sub">Sign in to access your timesheet.</div>
+
+    <div class="info-banner">
+      First time signing in? Any timesheet data already on this device will be
+      uploaded automatically — nothing gets deleted. After that, your data
+      syncs across devices.
+    </div>
+
+    <div class="field">
+      <label for="loginEmail">Email</label>
+      <input id="loginEmail" type="email" autocomplete="email" placeholder="you@example.com">
+    </div>
+    <div class="field">
+      <label for="loginPassword">Password</label>
+      <input id="loginPassword" type="password" autocomplete="current-password" placeholder="At least 6 characters">
+    </div>
+
+    <div class="row-actions">
+      <button id="signInBtn" class="primary">Sign in</button>
+      <button id="signUpBtn">Create account</button>
+    </div>
+
+    <div class="divider">or</div>
+
+    <button id="googleBtn" class="btn-google">
+      <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/>
+        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.3 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/>
+        <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.6 39.6 16.2 44 24 44z"/>
+        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.2 5.2c-.4.4 6.7-4.9 6.7-14.8 0-1.2-.1-2.4-.4-3.5z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- ================= APP SCREEN ================= -->
+<div class="wrap hidden" id="appScreen">
   <div class="card">
     <div class="topbar">
       <div>
         <h1>Timesheet</h1>
-        <div class="muted">Saved on this device • Works offline</div>
+        <div class="muted">
+          Saved on this device &amp; in the cloud • Works offline
+        </div>
       </div>
 
       <div class="controls">
@@ -103,6 +181,11 @@
         <button class="primary" id="newMonthBtn" title="Create a new month based on the selected month">New month</button>
         <button id="exportBtn" title="Export current month as JSON">Export</button>
         <button id="resetBtn" title="Reset current month data">Reset</button>
+
+        <span class="user-chip">
+          <span id="userEmailChip"></span>
+          <button id="signOutBtn" title="Sign out">Sign out</button>
+        </span>
       </div>
     </div>
 
@@ -132,91 +215,136 @@
   </div>
 </div>
 
-<script>
-  // ======= Storage shape =======
-  // key: "timesheet:v1"
-  // data: { months: { "2025-11": { rows: [...] } }, monthOrder: ["2025-11", ...] }
+<script type="module">
+  // ============================================================
+  //  Firebase
+  // ============================================================
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import {
+    getAuth, onAuthStateChanged,
+    signInWithEmailAndPassword, createUserWithEmailAndPassword,
+    GoogleAuthProvider, signInWithPopup, signOut
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+  import {
+    initializeFirestore, getFirestore,
+    persistentLocalCache, persistentMultipleTabManager,
+    doc, getDoc, setDoc, onSnapshot, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDislLWIReKRRNEsMKL1Lkcz0Sa5DrkPBw",
+    authDomain: "timesheet-pwa-b30e2.firebaseapp.com",
+    projectId: "timesheet-pwa-b30e2",
+    storageBucket: "timesheet-pwa-b30e2.firebasestorage.app",
+    messagingSenderId: "289524739847",
+    appId: "1:289524739847:web:f92af2eccb1c8d2a9a1fa2"
+  };
+
+  // Allowlisted accounts. Anyone else who signs in is rejected.
+  // Mirror this list in Firestore security rules (see README/console).
+  const ALLOWED_EMAILS = [
+    "wangylhs2@gmail.com",
+    "nomi4458898@gmail.com"
+  ];
+
+  const fbApp = initializeApp(firebaseConfig);
+  const auth = getAuth(fbApp);
+
+  // Firestore with persistent IndexedDB cache (offline-friendly PWA).
+  // Falls back to in-memory cache if IndexedDB isn't available (private window etc.).
+  let db;
+  try {
+    db = initializeFirestore(fbApp, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+  } catch {
+    db = getFirestore(fbApp);
+  }
+
+  // ============================================================
+  //  DOM refs — login
+  // ============================================================
+  const loginScreen   = document.getElementById("loginScreen");
+  const appScreen     = document.getElementById("appScreen");
+  const emailInput    = document.getElementById("loginEmail");
+  const passwordInput = document.getElementById("loginPassword");
+  const signInBtn     = document.getElementById("signInBtn");
+  const signUpBtn     = document.getElementById("signUpBtn");
+  const googleBtn     = document.getElementById("googleBtn");
+  const loginErr      = document.getElementById("loginErr");
+  const signOutBtn    = document.getElementById("signOutBtn");
+  const userEmailChip = document.getElementById("userEmailChip");
+
+  // ============================================================
+  //  DOM refs — app (timesheet)
+  // ============================================================
+  const statusPill = document.getElementById("statusPill");
+  const monthSel   = document.getElementById("monthSel");
+  const tbody      = document.getElementById("tbody");
+  const totalBox   = document.getElementById("totalBox");
+  const exportBtn  = document.getElementById("exportBtn");
+  const resetBtn   = document.getElementById("resetBtn");
+  const newMonthBtn = document.getElementById("newMonthBtn");
+
+  // ============================================================
+  //  Storage helpers
+  //    Local: localStorage keyed "timesheet:v1" (offline cache)
+  //    Cloud: Firestore doc users/{uid}
+  //    Shape: { months: { "YYYY-MM": { rows: [...] } }, monthOrder: [...] }
+  // ============================================================
   const STORE_KEY = "timesheet:v1";
   const DUTIES = ["", "Bake", "Kitchen", "Other"];
 
-  const statusPill = document.getElementById("statusPill");
-  const monthSel = document.getElementById("monthSel");
-  const tbody = document.getElementById("tbody");
-  const totalBox = document.getElementById("totalBox");
-  const exportBtn = document.getElementById("exportBtn");
-  const resetBtn = document.getElementById("resetBtn");
-  const newMonthBtn = document.getElementById("newMonthBtn");
-
   const fmt2 = (n) => (Math.round(n * 100) / 100).toFixed(2);
-
-  function setStatus(ok, text) {
-    statusPill.textContent = text;
-    statusPill.style.color = ok ? "#0a7a2f" : "#b00020";
-  }
 
   function pad2(n){ return String(n).padStart(2,"0"); }
 
-    // generates ["05:00","05:15",...,"19:00"]
-    function buildTimeOptions(startHH=5, endHH=19, stepMin=15) {
+  // generates ["05:00","05:15",...,"19:00"]
+  function buildTimeOptions(startHH=5, endHH=19, stepMin=15) {
     const out = [""];
     for (let h = startHH; h <= endHH; h++) {
-        for (let m = 0; m < 60; m += stepMin) {
-        if (h === endHH && m > 0) break; // stop at 19:00 exactly
+      for (let m = 0; m < 60; m += stepMin) {
+        if (h === endHH && m > 0) break;
         out.push(`${pad2(h)}:${pad2(m)}`);
-        }
+      }
     }
     return out;
-    }
-    const TIME_OPTS = buildTimeOptions(5, 19, 15);
+  }
+  const TIME_OPTS = buildTimeOptions(5, 19, 15);
 
   function loadStore() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
       if (!raw) return null;
       return JSON.parse(raw);
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }
-
-  function saveStore(store) {
-    localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  function saveStore(s) {
+    localStorage.setItem(STORE_KEY, JSON.stringify(s));
   }
 
   function ymd(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${dd}`;
+    return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
   }
-
   function monthKeyFromDate(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    return `${y}-${m}`;
+    return `${d.getFullYear()}-${pad2(d.getMonth()+1)}`;
   }
-
   function daysInMonth(y, m1to12) {
     return new Date(y, m1to12, 0).getDate();
   }
-
   function weekdayShort(d) {
     return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
   }
 
-  // time strings "HH:MM" -> minutes
   function normalizeTimeString(value) {
     if (value === null || value === undefined) return "";
     const s = String(value).trim();
     if (!s) return "";
-
     const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?$/);
     if (!m) return s;
-
     let h = Number(m[1]);
     const mm = Number(m[2]);
     const ampm = (m[3] || "").toLowerCase();
-
     if (!Number.isFinite(h) || !Number.isFinite(mm) || mm < 0 || mm > 59) return s;
     if (ampm) {
       if (h < 1 || h > 12) return s;
@@ -224,14 +352,13 @@
       if (ampm === "am" && h === 12) h = 0;
     }
     if (h < 0 || h > 23) return s;
-
     return `${pad2(h)}:${pad2(mm)}`;
   }
 
   function toMinutes(hhmm) {
-    const normalized = normalizeTimeString(hhmm);
-    if (!normalized) return null;
-    const [h, m] = normalized.split(":").map(Number);
+    const n = normalizeTimeString(hhmm);
+    if (!n) return null;
+    const [h, m] = n.split(":").map(Number);
     if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
     return h * 60 + m;
   }
@@ -241,29 +368,24 @@
     const e = toMinutes(endHHMM);
     const lunch = Number(lunchHours || 0);
     if (s === null || e === null) return 0;
-
-    // same-day by default; if end < start assume overnight shift
     let diff = e - s;
-    if (diff < 0) diff += 24 * 60;
-
+    if (diff < 0) diff += 24 * 60; // overnight shift
     const hours = diff / 60 - lunch;
     return hours > 0 ? hours : 0;
   }
 
   function makeBlankMonth(monthKey) {
     const [yStr, mStr] = monthKey.split("-");
-    const y = Number(yStr);
-    const m = Number(mStr); // 1..12
+    const y = Number(yStr), m = Number(mStr);
     const n = daysInMonth(y, m);
-
     const rows = [];
     for (let day = 1; day <= n; day++) {
       const d = new Date(y, m - 1, day);
       rows.push({
-        date: ymd(d),              // YYYY-MM-DD
-        day: weekdayShort(d),      // Mon, Tue...
-        start: "",                 // HH:MM
-        end: "",                   // HH:MM
+        date: ymd(d),
+        day: weekdayShort(d),
+        start: "",
+        end: "",
         duty: "",
         lunch: "0.5",
       });
@@ -272,19 +394,33 @@
   }
 
   function ensureInit() {
-    let store = loadStore();
-    if (!store) {
-      const now = new Date();
-      const mk = monthKeyFromDate(now);
-      store = { months: {}, monthOrder: [] };
-      store.months[mk] = makeBlankMonth(mk);
-      store.monthOrder.push(mk);
-      saveStore(store);
+    let s = loadStore();
+    if (!s) {
+      const mk = monthKeyFromDate(new Date());
+      s = { months: {}, monthOrder: [] };
+      s.months[mk] = makeBlankMonth(mk);
+      s.monthOrder.push(mk);
+      saveStore(s);
     }
-    return store;
+    return s;
   }
 
-  function renderMonthOptions(store, selected) {
+  // ============================================================
+  //  Render
+  // ============================================================
+  let store = null;          // populated after sign-in
+  let currentMonth = null;
+  let currentUser = null;
+  let userDocRef = null;
+  let unsubscribeSnap = null;
+  let saveTimer = null;
+
+  function setStatus(ok, text) {
+    statusPill.textContent = text;
+    statusPill.style.color = ok ? "#0a7a2f" : "#b00020";
+  }
+
+  function renderMonthOptions(selected) {
     monthSel.innerHTML = "";
     for (const mk of store.monthOrder) {
       const opt = document.createElement("option");
@@ -295,32 +431,37 @@
     }
   }
 
-  function renderTable(store, mk) {
+  function renderTotal(mk) {
+    const month = store.months[mk];
+    let total = 0;
+    for (const r of month.rows) total += calcHours(r.start, r.end, r.lunch);
+    totalBox.textContent = `Total: ${fmt2(total)}`;
+  }
+
+  function renderTable(mk) {
     const month = store.months[mk];
     if (!month) return;
-
     tbody.innerHTML = "";
 
-    month.rows.forEach((row, idx) => {
+    month.rows.forEach((row) => {
       const startNorm = normalizeTimeString(row.start);
-      const endNorm = normalizeTimeString(row.end);
+      const endNorm   = normalizeTimeString(row.end);
       if (row.start !== startNorm) row.start = startNorm;
       if (row.end !== endNorm) row.end = endNorm;
 
       const tr = document.createElement("tr");
-
       tr.innerHTML = `
         <td><input type="date" value="${row.date}"></td>
         <td>${row.day}</td>
         <td>
-        <select data-start>
+          <select data-start>
             ${TIME_OPTS.map(t => `<option value="${t}">${t}</option>`).join("")}
-        </select>
+          </select>
         </td>
         <td>
-        <select data-end>
+          <select data-end>
             ${TIME_OPTS.map(t => `<option value="${t}">${t}</option>`).join("")}
-        </select>
+          </select>
         </td>
         <td>
           <select>${DUTIES.map(d => `<option ${d===row.duty?"selected":""}>${d}</option>`).join("")}</select>
@@ -336,23 +477,21 @@
       const lunchEl = tr.children[5].querySelector("input");
       const hoursTd = tr.querySelector("[data-hours]");
 
-      // Bind values after options exist to avoid template selected edge cases.
-      const normalizedStart = normalizeTimeString(row.start);
-      const normalizedEnd = normalizeTimeString(row.end);
-      if (normalizedStart && !TIME_OPTS.includes(normalizedStart)) {
-        const opt = document.createElement("option");
-        opt.value = normalizedStart;
-        opt.textContent = normalizedStart;
-        startEl.appendChild(opt);
+      // Bind values after options exist (handles non-standard times)
+      const ns = normalizeTimeString(row.start);
+      const ne = normalizeTimeString(row.end);
+      if (ns && !TIME_OPTS.includes(ns)) {
+        const o = document.createElement("option");
+        o.value = ns; o.textContent = ns;
+        startEl.appendChild(o);
       }
-      if (normalizedEnd && !TIME_OPTS.includes(normalizedEnd)) {
-        const opt = document.createElement("option");
-        opt.value = normalizedEnd;
-        opt.textContent = normalizedEnd;
-        endEl.appendChild(opt);
+      if (ne && !TIME_OPTS.includes(ne)) {
+        const o = document.createElement("option");
+        o.value = ne; o.textContent = ne;
+        endEl.appendChild(o);
       }
-      startEl.value = normalizedStart;
-      endEl.value = normalizedEnd;
+      startEl.value = ns;
+      endEl.value = ne;
 
       function syncDayFromDate() {
         const d = new Date(dateEl.value + "T00:00:00");
@@ -360,77 +499,150 @@
         tr.children[1].textContent = row.day;
       }
 
-      function updateHoursAndSave() {
+      function updateAndSave() {
         const h = calcHours(row.start, row.end, row.lunch);
         hoursTd.textContent = fmt2(h);
-        saveStore(store);
-        renderTotal(store, mk);
-        setStatus(true, "Saved");
+        persistLocalAndCloud();
+        renderTotal(currentMonth);
       }
 
-      // init hours
       hoursTd.textContent = fmt2(calcHours(row.start, row.end, row.lunch));
 
-      // listeners
       dateEl.addEventListener("change", () => {
         row.date = dateEl.value;
         syncDayFromDate();
-        updateHoursAndSave();
+        updateAndSave();
       });
-
-      startEl.addEventListener("change", () => { row.start = startEl.value; updateHoursAndSave(); });
-      endEl.addEventListener("change", () => { row.end = endEl.value; updateHoursAndSave(); });
-      dutyEl.addEventListener("change", () => { row.duty = dutyEl.value; updateHoursAndSave(); });
-      lunchEl.addEventListener("change", () => { row.lunch = lunchEl.value; updateHoursAndSave(); });
+      startEl.addEventListener("change", () => { row.start = startEl.value; updateAndSave(); });
+      endEl.addEventListener("change",   () => { row.end   = endEl.value;   updateAndSave(); });
+      dutyEl.addEventListener("change",  () => { row.duty  = dutyEl.value;  updateAndSave(); });
+      lunchEl.addEventListener("change", () => { row.lunch = lunchEl.value; updateAndSave(); });
 
       tbody.appendChild(tr);
     });
 
-    renderTotal(store, mk);
+    renderTotal(mk);
   }
 
-  function renderTotal(store, mk) {
-    const month = store.months[mk];
-    let total = 0;
-    for (const r of month.rows) total += calcHours(r.start, r.end, r.lunch);
-    totalBox.textContent = `Total: ${fmt2(total)}`;
-  }
-
-  function addNextMonth(store, baseMk) {
+  function addNextMonth(baseMk) {
     const [yStr, mStr] = baseMk.split("-");
-    let y = Number(yStr);
-    let m = Number(mStr); // 1..12
+    let y = Number(yStr), m = Number(mStr);
     m += 1;
     if (m === 13) { m = 1; y += 1; }
-    const nextMk = `${y}-${String(m).padStart(2,"0")}`;
-
+    const nextMk = `${y}-${pad2(m)}`;
     if (!store.months[nextMk]) {
       store.months[nextMk] = makeBlankMonth(nextMk);
       store.monthOrder.push(nextMk);
-      saveStore(store);
     }
     return nextMk;
   }
 
-  // ======= App boot =======
-  let store = ensureInit();
-  let currentMonth = store.monthOrder[store.monthOrder.length - 1];
+  // ============================================================
+  //  Sync — local + Firestore
+  // ============================================================
+  function persistLocalAndCloud() {
+    saveStore(store);                 // immediate local cache
+    setStatus(true, "Saved locally");
 
-  renderMonthOptions(store, currentMonth);
-  renderTable(store, currentMonth);
-  setStatus(true, "Ready");
+    if (!userDocRef) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      try {
+        await setDoc(userDocRef, {
+          months: store.months,
+          monthOrder: store.monthOrder,
+          email: currentUser.email,
+          updatedAt: serverTimestamp()
+        });
+        setStatus(true, "Synced");
+      } catch (e) {
+        setStatus(false, `Sync failed: ${e.code || e.message}`);
+        // Local copy still saved; will retry on next edit.
+      }
+    }, 500);
+  }
 
+  async function loadFromCloud() {
+    if (!userDocRef) return;
+    setStatus(true, "Loading from cloud…");
+    try {
+      const snap = await getDoc(userDocRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        store = { months: data.months || {}, monthOrder: data.monthOrder || [] };
+        if (!store.monthOrder.length) {
+          store = ensureInit();
+        }
+        saveStore(store);
+        setStatus(true, "Loaded");
+      } else {
+        // First sign-in for this user — push current local data up
+        store = ensureInit();
+        await setDoc(userDocRef, {
+          months: store.months,
+          monthOrder: store.monthOrder,
+          email: currentUser.email,
+          updatedAt: serverTimestamp(),
+          createdAt: serverTimestamp()
+        });
+        setStatus(true, "Initialized");
+      }
+    } catch (e) {
+      // Permission denied = user not on allowlist
+      if (e.code === "permission-denied") {
+        showLoginError("Your account isn't on the allowlist. Ask the owner to add you.");
+        await signOut(auth);
+        return;
+      }
+      setStatus(false, `Load failed: ${e.code || e.message}`);
+      // Fall back to local cache so app is still usable
+      store = loadStore() || ensureInit();
+    }
+
+    currentMonth = store.monthOrder[store.monthOrder.length - 1];
+    renderMonthOptions(currentMonth);
+    renderTable(currentMonth);
+    subscribeRemoteChanges();
+  }
+
+  function subscribeRemoteChanges() {
+    if (unsubscribeSnap) unsubscribeSnap();
+    unsubscribeSnap = onSnapshot(userDocRef, (snap) => {
+      if (!snap.exists()) return;
+      // Skip our own in-flight writes; the confirmed snapshot will arrive next.
+      if (snap.metadata.hasPendingWrites) return;
+
+      const data = snap.data();
+      const remote = { months: data.months || {}, monthOrder: data.monthOrder || [] };
+      // Re-render only if something actually changed.
+      if (JSON.stringify(remote) === JSON.stringify({ months: store.months, monthOrder: store.monthOrder })) return;
+
+      store = remote;
+      saveStore(store);
+      if (!store.monthOrder.includes(currentMonth)) {
+        currentMonth = store.monthOrder[store.monthOrder.length - 1];
+      }
+      renderMonthOptions(currentMonth);
+      renderTable(currentMonth);
+      setStatus(true, "Updated from cloud");
+    }, (err) => {
+      setStatus(false, `Sync listener: ${err.code || err.message}`);
+    });
+  }
+
+  // ============================================================
+  //  Top-bar buttons (only active when signed in)
+  // ============================================================
   monthSel.addEventListener("change", () => {
     currentMonth = monthSel.value;
-    renderTable(store, currentMonth);
-    setStatus(true, "Ready");
+    renderTable(currentMonth);
   });
 
   newMonthBtn.addEventListener("click", () => {
-    store = ensureInit();
-    currentMonth = addNextMonth(store, currentMonth);
-    renderMonthOptions(store, currentMonth);
-    renderTable(store, currentMonth);
+    currentMonth = addNextMonth(currentMonth);
+    renderMonthOptions(currentMonth);
+    renderTable(currentMonth);
+    persistLocalAndCloud();
     setStatus(true, "Created");
   });
 
@@ -438,8 +650,6 @@
     const data = store.months[currentMonth];
     const blob = new Blob([JSON.stringify({ month: currentMonth, ...data }, null, 2)], { type: "application/json" });
     const fileName = `timesheet-${currentMonth}.json`;
-
-    // iOS may not support showSaveFilePicker; use share if possible
     if (navigator.share) {
       try {
         await navigator.share({ title: fileName, text: "Timesheet export", files: [new File([blob], fileName, { type: "application/json" })] });
@@ -447,7 +657,6 @@
         return;
       } catch {}
     }
-
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -460,303 +669,150 @@
   resetBtn.addEventListener("click", () => {
     if (!confirm(`Reset ${currentMonth} data?`)) return;
     store.months[currentMonth] = makeBlankMonth(currentMonth);
-    saveStore(store);
-    renderTable(store, currentMonth);
+    persistLocalAndCloud();
+    renderTable(currentMonth);
     setStatus(true, "Reset");
   });
 
-  // Register SW
+  // ============================================================
+  //  Auth UI
+  // ============================================================
+  function showLoginError(msg) {
+    loginErr.textContent = msg || "";
+  }
+  function clearLoginError() { loginErr.textContent = ""; }
+
+  function showLogin() {
+    loginScreen.classList.remove("hidden");
+    appScreen.classList.add("hidden");
+    passwordInput.value = "";
+  }
+  function showApp(user) {
+    loginScreen.classList.add("hidden");
+    appScreen.classList.remove("hidden");
+    userEmailChip.textContent = user.email || "";
+    clearLoginError();
+  }
+
+  function isAllowed(email) {
+    return email && ALLOWED_EMAILS.includes(email.toLowerCase());
+  }
+
+  function friendlyAuthError(e) {
+    const code = e?.code || "";
+    if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+      return "Email or password is incorrect.";
+    }
+    if (code === "auth/email-already-in-use") return "An account with that email already exists. Try Sign in.";
+    if (code === "auth/weak-password") return "Password must be at least 6 characters.";
+    if (code === "auth/invalid-email") return "That email doesn't look right.";
+    if (code === "auth/popup-closed-by-user") return "Google sign-in was cancelled.";
+    if (code === "auth/popup-blocked") return "Your browser blocked the Google sign-in popup. Allow popups and try again.";
+    if (code === "auth/network-request-failed") return "Network error. Check your connection and try again.";
+    return e?.message || "Sign-in failed.";
+  }
+
+  signInBtn.addEventListener("click", async () => {
+    clearLoginError();
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    if (!email || !password) { showLoginError("Enter email and password."); return; }
+    if (!isAllowed(email)) {
+      showLoginError("This email isn't on the allowlist.");
+      return;
+    }
+    signInBtn.disabled = true; signUpBtn.disabled = true; googleBtn.disabled = true;
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (e) {
+      showLoginError(friendlyAuthError(e));
+    } finally {
+      signInBtn.disabled = false; signUpBtn.disabled = false; googleBtn.disabled = false;
+    }
+  });
+
+  signUpBtn.addEventListener("click", async () => {
+    clearLoginError();
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    if (!email || !password) { showLoginError("Enter email and password."); return; }
+    if (!isAllowed(email)) {
+      showLoginError("This email isn't on the allowlist.");
+      return;
+    }
+    signInBtn.disabled = true; signUpBtn.disabled = true; googleBtn.disabled = true;
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (e) {
+      showLoginError(friendlyAuthError(e));
+    } finally {
+      signInBtn.disabled = false; signUpBtn.disabled = false; googleBtn.disabled = false;
+    }
+  });
+
+  googleBtn.addEventListener("click", async () => {
+    clearLoginError();
+    googleBtn.disabled = true; signInBtn.disabled = true; signUpBtn.disabled = true;
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged will handle the rest, including allowlist check.
+    } catch (e) {
+      showLoginError(friendlyAuthError(e));
+    } finally {
+      googleBtn.disabled = false; signInBtn.disabled = false; signUpBtn.disabled = false;
+    }
+  });
+
+  signOutBtn.addEventListener("click", async () => {
+    if (unsubscribeSnap) { unsubscribeSnap(); unsubscribeSnap = null; }
+    await signOut(auth);
+  });
+
+  // Press Enter in either login field → trigger Sign in
+  for (const el of [emailInput, passwordInput]) {
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); signInBtn.click(); }
+    });
+  }
+
+  // ============================================================
+  //  Auth state — main entry point
+  // ============================================================
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      currentUser = null;
+      userDocRef = null;
+      store = null;
+      currentMonth = null;
+      if (unsubscribeSnap) { unsubscribeSnap(); unsubscribeSnap = null; }
+      showLogin();
+      return;
+    }
+
+    // Block users not on the allowlist (UX layer; rules enforce server-side).
+    if (!isAllowed(user.email)) {
+      showLoginError("Your account isn't on the allowlist. Ask the owner to add you.");
+      await signOut(auth);
+      return;
+    }
+
+    currentUser = user;
+    // Doc keyed by email so Google + email/password sign-in for the same
+    // person hit the same data (different auth providers produce different UIDs).
+    userDocRef = doc(db, "users", user.email.toLowerCase());
+    showApp(user);
+    await loadFromCloud();
+  });
+
+  // ============================================================
+  //  Service worker
+  // ============================================================
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./sw.js").catch(() => {});
     });
   }
-
-  // ====== CONFIG ======
-const GOOGLE_CLIENT_ID = "644218233242-sst0d01r547bq1lmuuf3inls19foetet.apps.googleusercontent.com";
-const SPREADSHEET_ID = "1FTzC7-1Eqj7G-y7fiG6Hq8EIk24EwCC_IQIo0qFZglY";
-const SHEET_NAME = "Data"; // <-- set to your tab name exactly
-const SHEET_GID = 27394589; // target tab from spreadsheet URL
-const SCOPES = "https://www.googleapis.com/auth/spreadsheets"; // read+write
-const SHEET_HEADER = ["month", "date", "start", "end", "duty", "lunch", "hours", "updatedAt"];
-
-let accessToken = null;
-let tokenClient = null;
-
-const signInBtn = document.getElementById("googleSignInBtn");
-const syncDownBtn = document.getElementById("syncDownBtn");
-const syncUpBtn = document.getElementById("syncUpBtn");
-const syncStatus = document.getElementById("syncStatus");
-
-function setSyncStatus(t) { syncStatus.textContent = t; }
-function setSyncEnabled(enabled) {
-  syncDownBtn.disabled = !enabled;
-  syncUpBtn.disabled = !enabled;
-}
-
-function initGoogleTokenClient() {
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: GOOGLE_CLIENT_ID,
-    scope: SCOPES,
-    callback: () => {},
-  });
-}
-
-async function requestGoogleAccessToken(prompt = "") {
-  if (!tokenClient) throw new Error("Google auth not initialized");
-  return new Promise((resolve, reject) => {
-    tokenClient.callback = (resp) => {
-      if (resp?.error) {
-        accessToken = null;
-        setSyncEnabled(false);
-        reject(new Error(resp.error));
-        return;
-      }
-      accessToken = resp.access_token;
-      setSyncEnabled(true);
-      resolve(accessToken);
-    };
-    tokenClient.requestAccessToken({ prompt });
-  });
-}
-
-async function trySilentSignIn() {
-  try {
-    await requestGoogleAccessToken("");
-    setSyncStatus("Signed in ✅");
-  } catch {
-    setSyncStatus("Not signed in");
-    setSyncEnabled(false);
-  }
-}
-
-window.addEventListener("load", () => {
-  initGoogleTokenClient();
-  setSyncStatus("Checking Google session…");
-  trySilentSignIn();
-});
-
-signInBtn.addEventListener("click", async () => {
-  setSyncStatus("Signing in…");
-  try {
-    await requestGoogleAccessToken("");
-    setSyncStatus("Signed in ✅");
-  } catch {
-    try {
-      await requestGoogleAccessToken("consent");
-      setSyncStatus("Signed in ✅");
-    } catch (e) {
-      setSyncStatus(`Sign-in failed: ${e.message || e}`);
-    }
-  }
-});
-
-// Helper for calling Sheets API
-async function sheetsFetch(path, options = {}, allowRetry = true) {
-  if (!accessToken) {
-    await requestGoogleAccessToken("");
-  }
-  const base = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}`;
-  const url = String(path).startsWith("?") ? `${base}${path}` : `${base}/${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      "Authorization": `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
-  });
-  if (res.status === 401 && allowRetry) {
-    accessToken = null;
-    await requestGoogleAccessToken("");
-    return sheetsFetch(path, options, false);
-  }
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Sheets API error ${res.status}: ${text}`);
-  }
-  return res.json();
-}
-
-function a1Range(sheetName, range) {
-  const escaped = String(sheetName || "").replace(/'/g, "''");
-  return encodeURIComponent(`'${escaped}'!${range}`);
-}
-
-function hasHeaderRow(values) {
-  const firstRow = values[0] || [];
-  return SHEET_HEADER.every((h, i) => String(firstRow[i] || "").toLowerCase() === h);
-}
-
-async function ensureHeaderRow(sheetName, values) {
-  if (values.length) return values;
-  const headerRange = a1Range(sheetName, "A1:H1");
-  await sheetsFetch(`values/${headerRange}?valueInputOption=RAW`, {
-    method: "PUT",
-    body: JSON.stringify({ values: [SHEET_HEADER] })
-  });
-  return [SHEET_HEADER];
-}
-
-async function getTargetSheetName() {
-  const meta = await sheetsFetch(`?fields=sheets.properties(sheetId,title)`);
-  const sheets = meta?.sheets || [];
-  const byId = sheets.find(s => s?.properties?.sheetId === SHEET_GID)?.properties?.title;
-  return byId || SHEET_NAME;
-}
-
-// ====== YOUR APP HOOKS ======
-// Implement these two functions in your app:
-// - getMonthDataForSync(monthKey) -> array of row objects for that month
-// - applyMonthDataFromSync(monthKey, rows) -> update your local storage/table
-
-// Example row object shape:
-// { month:"2026-03", date:"2026-03-01", start:"08:15", end:"14:45", duty:"Kitchen", lunch:"0.5", hours:"5.75" }
-
-function getMonthDataForSync(monthKey) {
-  const month = store.months[monthKey];
-  if (!month?.rows) return [];
-  return month.rows
-    .filter(r => r.date)
-    .map(r => ({
-      month: monthKey,
-      date: r.date || "",
-      start: r.start || "",
-      end: r.end || "",
-      duty: r.duty || "",
-      lunch: r.lunch ?? "",
-      hours: fmt2(calcHours(r.start, r.end, r.lunch))
-    }));
-}
-
-function applyMonthDataFromSync(monthKey, rows) {
-  if (!store.months[monthKey]) {
-    store.months[monthKey] = makeBlankMonth(monthKey);
-    if (!store.monthOrder.includes(monthKey)) store.monthOrder.push(monthKey);
-  }
-
-  const month = store.months[monthKey];
-  const rowByDate = new Map(rows.map(r => [r.date, r]));
-
-  month.rows = month.rows.map(localRow => {
-    const incoming = rowByDate.get(localRow.date);
-    if (!incoming) return localRow;
-    return {
-      ...localRow,
-      start: normalizeTimeString(incoming.start),
-      end: normalizeTimeString(incoming.end),
-      duty: incoming.duty || "",
-      lunch: incoming.lunch ?? localRow.lunch ?? "0.5",
-      day: weekdayShort(new Date(localRow.date + "T00:00:00"))
-    };
-  });
-
-  renderMonthOptions(store, monthKey);
-  currentMonth = monthKey;
-  renderTable(store, monthKey);
-  saveStore(store);
-}
-
-// ====== SYNC DOWN: load month from sheet ======
-syncDownBtn.addEventListener("click", async () => {
-  try {
-    const monthKey = document.getElementById("monthSel")?.value || ""; // if you have month dropdown
-    setSyncStatus("Loading…");
-    const sheetName = await getTargetSheetName();
-
-    const range = a1Range(sheetName, "A:H");
-    const data = await sheetsFetch(`values/${range}`);
-    const values = data.values || [];
-    const body = hasHeaderRow(values) ? values.slice(1) : values;
-    const filtered = body
-      .filter(r => (r[0] || "") === monthKey)
-      .map(r => ({
-        month: r[0] || "",
-        date: r[1] || "",
-        start: normalizeTimeString(r[2]),
-        end: normalizeTimeString(r[3]),
-        duty: r[4] || "",
-        lunch: r[5] || "",
-        hours: r[6] || "",
-        updatedAt: r[7] || ""
-      }));
-
-    applyMonthDataFromSync(monthKey, filtered);
-    setSyncStatus(`Loaded ✅ (${sheetName})`);
-  } catch (e) {
-    setSyncStatus(String(e.message || e));
-  }
-});
-
-// ====== SYNC UP: upsert month rows into sheet ======
-syncUpBtn.addEventListener("click", async () => {
-  try {
-    const monthKey = document.getElementById("monthSel")?.value || "";
-    setSyncStatus("Saving…");
-    const sheetName = await getTargetSheetName();
-
-    // 1) Read entire sheet to find existing rows for that month+date
-    const rangeAll = a1Range(sheetName, "A:H");
-    const data = await sheetsFetch(`values/${rangeAll}`);
-    const values = await ensureHeaderRow(sheetName, data.values || []);
-    const headerExists = hasHeaderRow(values);
-    const body = headerExists ? values.slice(1) : values;
-
-    // Map existing row -> sheet row index (1-based in Sheets; header is row 1)
-    const indexByKey = new Map();
-    const firstDataRowIndex = headerExists ? 2 : 1;
-    body.forEach((r, i) => {
-      const m = r[0] || "";
-      const d = r[1] || "";
-      if (m && d) indexByKey.set(`${m}|${d}`, i + firstDataRowIndex);
-    });
-
-    // 2) Upsert each local row
-    const localRows = getMonthDataForSync(monthKey);
-    if (!localRows.length) {
-      setSyncStatus("No rows to save for this month");
-      return;
-    }
-    const now = new Date().toISOString();
-
-    for (const row of localRows) {
-      if (!row.date) continue;
-      const key = `${monthKey}|${row.date}`;
-      const sheetRowIndex = indexByKey.get(key);
-
-      const rowValues = [[
-        monthKey,
-        row.date,
-        row.start || "",
-        row.end || "",
-        row.duty || "",
-        row.lunch ?? "",
-        row.hours ?? "",
-        now
-      ]];
-
-      if (sheetRowIndex) {
-        // Update existing row A:H at that row index
-        const updateRange = a1Range(sheetName, `A${sheetRowIndex}:H${sheetRowIndex}`);
-        await sheetsFetch(`values/${updateRange}?valueInputOption=USER_ENTERED`, {
-          method: "PUT",
-          body: JSON.stringify({ values: rowValues })
-        });
-      } else {
-        // Append new row
-        const appendRange = a1Range(sheetName, "A:H");
-        await sheetsFetch(`values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
-          method: "POST",
-          body: JSON.stringify({ values: rowValues })
-        });
-      }
-    }
-
-    setSyncStatus(`Saved ✅ (${localRows.length} rows to ${sheetName})`);
-  } catch (e) {
-    setSyncStatus(String(e.message || e));
-  }
-});
 </script>
 </body>
 </html>
