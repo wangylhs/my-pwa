@@ -24,6 +24,9 @@ docs/                         <- served by GitHub Pages
     icon-192.png
     icon-512.png
 README.md
+firestore.rules                <- deployed Firestore access-control rules
+firebase.json                  <- Firebase CLI rules configuration
+.firebaserc                    <- Firebase project binding
 ```
 
 No build step. Open `docs/index.html` directly or serve `docs/` with any static file server.
@@ -55,12 +58,18 @@ Local cache uses the same shape under `localStorage` key `timesheet:v1`.
 
 ## Allowlist (adding or removing users)
 
-Two places must agree, or sign-in will succeed but data access will be blocked:
+Two source-controlled places must agree, or sign-in will succeed but data access will be blocked:
 
 1. **`docs/index.html`** — the `ALLOWED_EMAILS` array (search for it near the top of the `<script type="module">`). This is the UX gate.
-2. **Firestore security rules** in Firebase Console → Firestore → Rules tab. Edit the `isAllowed()` function. This is the real security boundary.
+2. **`firestore.rules`** — edit the `isAllowed()` function. This is the real security boundary.
 
-After editing, commit/push the HTML change AND click Publish on the rules tab.
+After editing, commit/push the HTML change and deploy the rules with:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+The Firebase CLI deployment overwrites the rules shown in Firebase Console, so treat `firestore.rules` as the source of truth and do not maintain a separate Console-only version.
 
 ## Local development
 
@@ -78,13 +87,19 @@ When you change `index.html` or `sw.js`, bump the cache name in `sw.js` (`timesh
 
 Push to `main`. GitHub Pages serves `docs/` automatically (configured in repo Settings → Pages). Allow ~30 seconds, then hard-refresh the live URL to activate the new service worker.
 
+Firestore rules are deployed separately and are not picked up automatically by GitHub Pages:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
 ## Security model
 
 - **Auth allowlist** — only listed emails can sign in successfully (UX) or read/write data (rules).
 - **Per-user isolation** — Firestore rules require `request.auth.token.email == {email}` in the doc path; one user cannot read or write another user's doc.
 - **Public API key** — Firebase web API keys are intended to be public. They identify the project, not authorize access. All access control lives in Auth + Firestore rules.
 
-If you need to revoke a user, remove their email from both the `ALLOWED_EMAILS` array and the rules `isAllowed()` list, redeploy, and republish rules. Their existing Firestore doc is left in place; if you also want to delete it, do so manually in the Firestore console.
+If you need to revoke a user, remove their email from both the `ALLOWED_EMAILS` array and the `firestore.rules` `isAllowed()` list, push the app change, and deploy the rules. Their existing Firestore doc is left in place; if you also want to delete it, do so manually in the Firestore console.
 
 ## License
 

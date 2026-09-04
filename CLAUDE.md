@@ -7,6 +7,7 @@ This is a small personal **Timesheet PWA**. See `README.md` for the user-facing 
 - Single-file vanilla JS app at `docs/index.html` (HTML, inline CSS, ESM `<script type="module">` — no build step, no frameworks).
 - Service worker at `docs/sw.js`. Cache name is `timesheet-v3` and **must be bumped on every shipped change to `docs/`**, otherwise installed PWAs serve a stale shell.
 - PWA manifest at `docs/manifest.webmanifest`. Icons in `docs/icons/`.
+- Firestore rules at `firestore.rules`, configured by `firebase.json` and bound to project `timesheet-pwa-b30e2` in `.firebaserc`.
 - Hosted on GitHub Pages from the `docs/` folder. No CI, no other tooling.
 
 ## Tech in play
@@ -28,12 +29,18 @@ Open <http://localhost:8000>. `localhost` is allowlisted in Firebase Auth by def
 
 Commit and push. GitHub Pages picks up `docs/` automatically. Wait ~30s, hard-refresh the live URL to activate the new service worker.
 
+Firestore rules are a separate deployment:
+
+```
+firebase deploy --only firestore:rules
+```
+
 ## Recipes (things you will actually be asked to do)
 
 ### Add or remove an allowlisted user
 Edit BOTH places — they must match or sign-in succeeds but data access fails:
 1. `ALLOWED_EMAILS` array in `docs/index.html`.
-2. `isAllowed()` function in Firebase Console → Firestore → Rules → Publish. (Console step; cannot be done via code.)
+2. `isAllowed()` function in `firestore.rules`, then deploy with `firebase deploy --only firestore:rules`.
 
 ### Change anything in `docs/`
 Bump the cache name in `docs/sw.js` (`timesheet-v3` → `v4` etc.) in the same commit.
