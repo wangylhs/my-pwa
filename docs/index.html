@@ -2,126 +2,249 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Timesheet</title>
 
   <!-- PWA -->
   <link rel="manifest" href="./manifest.webmanifest">
-  <meta name="theme-color" content="#111111">
+  <meta name="theme-color" content="#f5f3ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#151514" media="(prefers-color-scheme: dark)">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Timesheet">
 
   <style>
-    :root { color-scheme: light dark; }
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f3ef;
+      --card: #ffffff;
+      --text: #1d1c1a;
+      --muted: #6e6a63;
+      --faint: #aaa59c;
+      --line: #e6e2da;
+      --chip: #efebe4;
+      --chip-press: #e3ded5;
+      --accent: #1e6b58;
+      --accent-ink: #ffffff;
+      --accent-soft: #e2eee9;
+      --ok: #2f8a5b;
+      --bad: #b3261e;
+      --shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #151514;
+        --card: #201f1d;
+        --text: #f2f0eb;
+        --muted: #a6a196;
+        --faint: #6d6960;
+        --line: #34322e;
+        --chip: #2b2a27;
+        --chip-press: #363431;
+        --accent: #62c3a3;
+        --accent-ink: #0c1f19;
+        --accent-soft: #1c2f28;
+        --ok: #62c3a3;
+        --bad: #f2b8b5;
+        --shadow: none;
+      }
+    }
+    * { box-sizing: border-box; }
+    [hidden], .hidden { display: none !important; }
+    html { -webkit-text-size-adjust: 100%; }
     body {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
       margin: 0;
-      padding: 18px;
-      line-height: 1.35;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
     }
-    .wrap { max-width: 980px; margin: 0 auto; }
+    button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; padding: 0; }
+    button:disabled { opacity: .35; cursor: default; }
+    .app {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: calc(10px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom));
+    }
+    header { display: flex; align-items: center; justify-content: space-between; margin: 2px 0 12px; }
+    header h1 { font-size: 24px; margin: 0; letter-spacing: -.015em; }
+    .status { font-size: 13px; color: var(--muted); }
+    .status::before {
+      content: ""; display: inline-block;
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--ok); margin-right: 6px; vertical-align: 1px;
+    }
+    .status.bad { color: var(--bad); }
+    .status.bad::before { background: var(--bad); }
+    .icon-btn {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: grid; place-items: center;
+      font-size: 22px; line-height: 1; color: var(--muted);
+    }
+    .icon-btn:active:not(:disabled) { background: var(--chip); }
+
     .card {
-      border: 1px solid rgba(127,127,127,.35);
-      border-radius: 16px;
-      padding: 14px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: var(--shadow);
     }
-    .topbar {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
+    .card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+    .card-head .t { font-weight: 650; font-size: 18px; }
+    .card-head .s { color: var(--muted); font-size: 14px; }
+    .card-head .h { font-weight: 650; font-variant-numeric: tabular-nums; }
+
+    /* Time tiles: the big number is what people see; a transparent native
+       time input sits on top so a tap opens the phone's own picker. */
+    .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .tile {
+      position: relative;
+      background: var(--chip);
+      border-radius: 14px;
+      padding: 10px 14px;
+      min-height: 76px;
+      display: flex; flex-direction: column; justify-content: center;
     }
-    h1 { font-size: 1.25rem; margin: 0; }
-    .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    select, input, button {
-      font: inherit;
-      padding: 8px 10px;
-      border-radius: 10px;
-      border: 1px solid rgba(127,127,127,.35);
-      background: transparent;
-    }
-    button { cursor: pointer; }
-    button.primary {
-      border: 0;
-      background: rgba(127,127,127,.18);
-      font-weight: 600;
-    }
-    .tableWrap { overflow: auto; border-radius: 12px; border: 1px solid rgba(127,127,127,.25); }
-    table { width: 100%; border-collapse: collapse; min-width: 860px; }
-    th, td { padding: 10px 10px; border-bottom: 1px solid rgba(127,127,127,.18); }
-    th { text-align: left; position: sticky; top: 0; background: rgba(20,20,20,.65); backdrop-filter: blur(6px); }
-    td input, td select { width: 100%; box-sizing: border-box; }
-    td.num { text-align: right; font-variant-numeric: tabular-nums; }
-    .muted { opacity: .75; font-size: .95rem; }
-    .footer {
-      display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-      padding-top: 12px;
-      align-items: center;
-    }
-    .totalBox {
-      border: 1px solid rgba(127,127,127,.35);
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-    }
-    .hint { font-size: .9rem; opacity: .8; }
-    .pill {
-      display: inline-block; padding: 4px 10px; border-radius: 999px;
-      border: 1px solid rgba(127,127,127,.35);
-      font-size: 0.9rem;
+    .tile:active { background: var(--chip-press); }
+    .tile .lab { font-size: 13px; color: var(--muted); }
+    .tile .val { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.01em; line-height: 1.15; }
+    .tile .val.empty { color: var(--faint); font-weight: 500; }
+    .tile input {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      opacity: 0; margin: 0; padding: 0; border: 0;
+      font-size: 16px;
+      -webkit-appearance: none; appearance: none;
     }
 
-    /* Login screen */
-    .login-wrap { max-width: 420px; margin: 60px auto; }
-    .login-card { padding: 22px; }
-    .login-card h1 { margin-bottom: 4px; }
-    .login-card .sub { opacity: .75; margin-bottom: 18px; }
-    .field { display: block; margin: 10px 0; }
-    .field label { display: block; font-size: .9rem; opacity: .8; margin-bottom: 4px; }
-    .field input { width: 100%; box-sizing: border-box; padding: 10px 12px; }
-    .row-actions { display: flex; gap: 8px; margin-top: 14px; }
-    .row-actions button { flex: 1; padding: 10px; }
-    .divider {
-      text-align: center; opacity: .6; margin: 18px 0 10px;
+    .primary {
+      width: 100%; margin-top: 12px; min-height: 68px;
+      border-radius: 16px;
+      background: var(--accent); color: var(--accent-ink);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    }
+    .primary b { font-size: 19px; }
+    .primary span { font-size: 13px; opacity: .85; font-variant-numeric: tabular-nums; }
+    .primary:active { transform: scale(.985); }
+    .done-line {
+      margin-top: 12px; padding: 14px;
+      border-radius: 16px; background: var(--accent-soft);
+      text-align: center; font-weight: 600;
+    }
+    .done-line small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+    .fields { display: flex; gap: 12px 16px; margin-top: 16px; align-items: flex-end; flex-wrap: wrap; }
+    .field-lab { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    .chips { display: flex; gap: 6px; }
+    .chip { min-height: 40px; padding: 0 14px; border-radius: 999px; background: var(--chip); font-size: 15px; }
+    .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+    .stepper { display: flex; align-items: center; background: var(--chip); border-radius: 999px; }
+    .stepper button { width: 42px; height: 40px; border-radius: 999px; font-size: 20px; }
+    .stepper button:active { background: var(--chip-press); }
+    .stepper .v { min-width: 46px; text-align: center; font-size: 15px; font-variant-numeric: tabular-nums; }
+
+    .month-bar { display: flex; align-items: center; justify-content: space-between; margin: 24px 0 8px; }
+    .month-bar .name { font-weight: 650; font-size: 18px; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .stat { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 14px; }
+    .stat .lab { font-size: 13px; color: var(--muted); }
+    .stat .big { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+    .list { background: var(--card); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; box-shadow: var(--shadow); }
+    .day {
+      display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center;
+      width: 100%; text-align: left;
+      padding: 10px 16px; min-height: 60px;
+      border-top: 1px solid var(--line);
+    }
+    .day:first-child { border-top: 0; }
+    .day:active { background: var(--chip); }
+    .day .d { display: flex; flex-direction: column; line-height: 1.1; }
+    .day .wd { font-size: 12px; color: var(--muted); }
+    .day .n { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .day .span { display: block; font-variant-numeric: tabular-nums; }
+    .day .duty { display: block; font-size: 13px; color: var(--muted); }
+    .day .hrs { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .day.off { min-height: 44px; }
+    .day.off .span, .day.off .n { color: var(--faint); }
+    .day.is-today .n { color: var(--accent); }
+    .empty-list { padding: 18px; color: var(--muted); text-align: center; }
+
+    dialog {
+      border: 0; padding: 0;
+      width: 100%; max-width: 480px;
+      margin: auto auto 0;
+      background: var(--card); color: var(--text);
+      border-radius: 22px 22px 0 0;
+    }
+    dialog::backdrop { background: rgba(0,0,0,.4); }
+    .sheet { padding: 10px 16px calc(18px + env(safe-area-inset-bottom)); }
+    .grabber { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 12px; }
+    .sheet-actions { display: flex; gap: 10px; margin-top: 18px; }
+    .sheet-actions button { flex: 1; min-height: 50px; border-radius: 14px; font-weight: 600; }
+    .ghost { background: var(--chip); }
+    .solid { background: var(--accent); color: var(--accent-ink); }
+    .menu-who { font-size: 13px; color: var(--muted); padding: 0 6px 8px; }
+    .menu-item { display: block; width: 100%; text-align: left; min-height: 52px; padding: 0 6px; border-top: 1px solid var(--line); font-size: 17px; }
+
+    .toast {
+      position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom));
+      transform: translate(-50%, 20px);
+      opacity: 0; pointer-events: none;
+      transition: opacity .18s, transform .18s;
+      background: var(--text); color: var(--bg);
+      border-radius: 14px; padding: 6px 6px 6px 16px;
       display: flex; align-items: center; gap: 10px;
+      width: max-content; max-width: calc(100% - 32px);
+      font-size: 15px;
     }
-    .divider::before, .divider::after {
-      content: ""; flex: 1; height: 1px; background: rgba(127,127,127,.3);
+    .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+    .toast button { min-height: 40px; padding: 0 14px; border-radius: 10px; font-weight: 700; color: var(--accent); background: rgba(127,127,127,.18); }
+    .toast:not(.has-undo) { padding: 14px 18px; }
+
+    /* Login screen */
+    .login { padding-top: calc(48px + env(safe-area-inset-top)); }
+    .login h1 { font-size: 24px; margin: 0 0 4px; letter-spacing: -.015em; }
+    .login .sub { color: var(--muted); margin-bottom: 14px; }
+    .info-banner {
+      background: var(--chip);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 6px;
     }
+    .field { display: block; margin: 12px 0; }
+    .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    .field input {
+      width: 100%; min-height: 48px; padding: 0 14px;
+      font: inherit; color: inherit;
+      background: var(--chip); border: 1px solid transparent; border-radius: 12px;
+    }
+    .field input:focus { outline: none; border-color: var(--accent); }
+    .login .sheet-actions { margin-top: 16px; }
+    .divider {
+      display: flex; align-items: center; gap: 10px;
+      color: var(--faint); margin: 18px 0 12px; font-size: 14px;
+    }
+    .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
     .btn-google {
-      width: 100%; padding: 10px; display: flex; gap: 10px; justify-content: center; align-items: center;
+      width: 100%; min-height: 50px; border-radius: 14px;
+      background: var(--chip); font-weight: 600;
+      display: flex; gap: 10px; justify-content: center; align-items: center;
     }
     .btn-google svg { width: 18px; height: 18px; }
-    .err {
-      color: #d23a3a; font-size: .9rem; min-height: 1.2em; margin-top: 10px;
-    }
-    .info-banner {
-      border: 1px solid rgba(127,127,127,.3);
-      background: rgba(127,127,127,.08);
-      border-radius: 10px;
-      padding: 10px 12px;
-      font-size: .9rem;
-      margin: 14px 0 4px;
-      line-height: 1.4;
-    }
-    .user-chip {
-      display: inline-flex; gap: 8px; align-items: center;
-      font-size: .9rem; opacity: .85;
-    }
-    .hidden { display: none !important; }
+    .err { color: var(--bad); font-size: 14px; min-height: 1.2em; margin-top: 12px; }
   </style>
 </head>
 
 <body>
 
 <!-- ================= LOGIN SCREEN ================= -->
-<div class="wrap login-wrap hidden" id="loginScreen">
-  <div class="card login-card">
+<div class="app login hidden" id="loginScreen">
+  <div class="card">
     <h1>Timesheet</h1>
     <div class="sub">Sign in to access your timesheet.</div>
 
@@ -140,14 +263,14 @@
       <input id="loginPassword" type="password" autocomplete="current-password" placeholder="At least 6 characters">
     </div>
 
-    <div class="row-actions">
-      <button id="signInBtn" class="primary">Sign in</button>
-      <button id="signUpBtn">Create account</button>
+    <div class="sheet-actions">
+      <button id="signInBtn" class="solid" type="button">Sign in</button>
+      <button id="signUpBtn" class="ghost" type="button">Create account</button>
     </div>
 
     <div class="divider">or</div>
 
-    <button id="googleBtn" class="btn-google">
+    <button id="googleBtn" class="btn-google" type="button">
       <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/>
         <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.3 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/>
@@ -162,58 +285,64 @@
 </div>
 
 <!-- ================= APP SCREEN ================= -->
-<div class="wrap hidden" id="appScreen">
-  <div class="card">
-    <div class="topbar">
-      <div>
-        <h1>Timesheet</h1>
-        <div class="muted">
-          Saved on this device &amp; in the cloud • Works offline
-        </div>
-      </div>
-
-      <div class="controls">
-        <span class="pill" id="statusPill">Loading…</span>
-
-        <label class="muted" for="monthSel">Month:</label>
-        <select id="monthSel"></select>
-
-        <button class="primary" id="newMonthBtn" title="Create a new month based on the selected month">New month</button>
-        <button id="exportBtn" title="Export current month as JSON">Export</button>
-        <button id="resetBtn" title="Reset current month data">Reset</button>
-
-        <span class="user-chip">
-          <span id="userEmailChip"></span>
-          <button id="signOutBtn" title="Sign out">Sign out</button>
-        </span>
-      </div>
+<div class="app hidden" id="appScreen">
+  <header>
+    <div>
+      <h1>Timesheet</h1>
+      <div class="status" id="statusPill">Loading…</div>
     </div>
+    <button class="icon-btn" id="menuBtn" type="button" aria-label="More">⋯</button>
+  </header>
 
-    <div class="tableWrap">
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 120px;">Date</th>
-            <th style="width: 80px;">Day</th>
-            <th style="width: 120px;">Start</th>
-            <th style="width: 120px;">End</th>
-            <th style="width: 140px;">Duty</th>
-            <th style="width: 120px;">Lunch (hrs)</th>
-            <th style="width: 110px; text-align:right;">Hours</th>
-          </tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-      </table>
+  <section class="card">
+    <div class="card-head">
+      <div><div class="t">Today</div><div class="s" id="todayDate"></div></div>
+      <div class="h" id="todayHours"></div>
     </div>
+    <div id="todayEditor"></div>
+    <button class="primary" id="primaryBtn" type="button"><b></b><span></span></button>
+    <div class="done-line" id="doneLine" hidden></div>
+  </section>
 
-    <div class="footer">
-      <div class="hint">
-        Tip: use <b>Start</b>/<b>End</b> time pickers. Hours auto-calculate as <code>End - Start - Lunch</code>.
-      </div>
-      <div class="totalBox" id="totalBox">Total: 0.00</div>
+  <div class="month-bar">
+    <button class="icon-btn" id="prevMonth" type="button" aria-label="Previous month">‹</button>
+    <div class="name" id="monthName"></div>
+    <button class="icon-btn" id="nextMonth" type="button" aria-label="Next month">›</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="lab">Total hours</div><div class="big" id="monthTotal"></div></div>
+    <div class="stat"><div class="lab">Days worked</div><div class="big" id="monthDays"></div></div>
+  </div>
+  <div class="list" id="dayList"></div>
+</div>
+
+<dialog id="sheet">
+  <div class="sheet">
+    <div class="grabber"></div>
+    <div class="card-head">
+      <div class="t" id="sheetTitle"></div>
+      <div class="h" id="sheetHours"></div>
+    </div>
+    <div id="sheetEditor"></div>
+    <div class="sheet-actions">
+      <button type="button" class="ghost" id="clearDayBtn">Clear day</button>
+      <button type="button" class="solid" id="sheetDoneBtn">Done</button>
     </div>
   </div>
-</div>
+</dialog>
+
+<dialog id="menu">
+  <div class="sheet">
+    <div class="grabber"></div>
+    <div class="menu-who">Signed in as <span id="userEmailChip"></span></div>
+    <button type="button" class="menu-item" id="exportBtn">Export this month</button>
+    <button type="button" class="menu-item" id="resetBtn">Reset this month…</button>
+    <button type="button" class="menu-item" id="signOutBtn">Sign out</button>
+    <div class="sheet-actions"><button type="button" class="ghost" id="menuCloseBtn">Close</button></div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="module">
   // ============================================================
@@ -264,53 +393,44 @@
   // ============================================================
   //  DOM refs — login
   // ============================================================
-  const loginScreen   = document.getElementById("loginScreen");
-  const appScreen     = document.getElementById("appScreen");
-  const emailInput    = document.getElementById("loginEmail");
-  const passwordInput = document.getElementById("loginPassword");
-  const signInBtn     = document.getElementById("signInBtn");
-  const signUpBtn     = document.getElementById("signUpBtn");
-  const googleBtn     = document.getElementById("googleBtn");
-  const loginErr      = document.getElementById("loginErr");
-  const signOutBtn    = document.getElementById("signOutBtn");
-  const userEmailChip = document.getElementById("userEmailChip");
+  const $ = (id) => document.getElementById(id);
+  const loginScreen   = $("loginScreen");
+  const appScreen     = $("appScreen");
+  const emailInput    = $("loginEmail");
+  const passwordInput = $("loginPassword");
+  const signInBtn     = $("signInBtn");
+  const signUpBtn     = $("signUpBtn");
+  const googleBtn     = $("googleBtn");
+  const loginErr      = $("loginErr");
+  const signOutBtn    = $("signOutBtn");
+  const userEmailChip = $("userEmailChip");
 
   // ============================================================
   //  DOM refs — app (timesheet)
   // ============================================================
-  const statusPill = document.getElementById("statusPill");
-  const monthSel   = document.getElementById("monthSel");
-  const tbody      = document.getElementById("tbody");
-  const totalBox   = document.getElementById("totalBox");
-  const exportBtn  = document.getElementById("exportBtn");
-  const resetBtn   = document.getElementById("resetBtn");
-  const newMonthBtn = document.getElementById("newMonthBtn");
+  const statusPill = $("statusPill");
+  const primaryBtn = $("primaryBtn");
+  const doneLine   = $("doneLine");
+  const dayList    = $("dayList");
+  const sheet      = $("sheet");
+  const menu       = $("menu");
+  const exportBtn  = $("exportBtn");
+  const resetBtn   = $("resetBtn");
 
   // ============================================================
   //  Storage helpers
   //    Local: localStorage keyed "timesheet:v1" (offline cache)
-  //    Cloud: Firestore doc users/{uid}
+  //    Cloud: Firestore doc users/{email}
   //    Shape: { months: { "YYYY-MM": { rows: [...] } }, monthOrder: [...] }
   // ============================================================
   const STORE_KEY = "timesheet:v1";
-  const DUTIES = ["", "Bake", "Kitchen", "Other"];
+  const DUTIES = ["Bake", "Kitchen", "Other"];   // "" means no duty picked
+  const MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+                       "July", "August", "September", "October", "November", "December"];
 
   const fmt2 = (n) => (Math.round(n * 100) / 100).toFixed(2);
 
   function pad2(n){ return String(n).padStart(2,"0"); }
-
-  // generates ["05:00","05:15",...,"19:00"]
-  function buildTimeOptions(startHH=5, endHH=19, stepMin=15) {
-    const out = [""];
-    for (let h = startHH; h <= endHH; h++) {
-      for (let m = 0; m < 60; m += stepMin) {
-        if (h === endHH && m > 0) break;
-        out.push(`${pad2(h)}:${pad2(m)}`);
-      }
-    }
-    return out;
-  }
-  const TIME_OPTS = buildTimeOptions(5, 19, 15);
 
   function loadStore() {
     try {
@@ -334,6 +454,10 @@
   }
   function weekdayShort(d) {
     return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+  }
+  function nowHHMM() {
+    const d = new Date();
+    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
   }
 
   function normalizeTimeString(value) {
@@ -406,135 +530,228 @@
   }
 
   // ============================================================
-  //  Render
+  //  State
+  //    Rows are addressed as { mk, i } rather than held as objects,
+  //    because a cloud snapshot can replace `store` at any moment.
   // ============================================================
   let store = null;          // populated after sign-in
-  let currentMonth = null;
+  let viewMonth = null;      // month shown in the list
+  let sheetLoc = null;       // row open in the day sheet
   let currentUser = null;
   let userDocRef = null;
   let unsubscribeSnap = null;
   let saveTimer = null;
 
+  function rowAt(loc) {
+    return loc && store && store.months[loc.mk] ? store.months[loc.mk].rows[loc.i] : null;
+  }
+
+  // Today's month is created in memory when needed. It reaches the cloud
+  // with the first edit, so merely opening the app never writes.
+  function todayLoc() {
+    const d = new Date();
+    const mk = monthKeyFromDate(d);
+    if (!store.months[mk]) {
+      store.months[mk] = makeBlankMonth(mk);
+      store.monthOrder.push(mk);
+    }
+    const rows = store.months[mk].rows;
+    let i = rows.findIndex((r) => r.date === ymd(d));
+    if (i === -1) {
+      rows.push({ date: ymd(d), day: weekdayShort(d), start: "", end: "", duty: "", lunch: "0.5" });
+      i = rows.length - 1;
+    }
+    return { mk, i };
+  }
+
+  function sortedMonths() {
+    return [...store.monthOrder].sort();
+  }
+
   function setStatus(ok, text) {
     statusPill.textContent = text;
-    statusPill.style.color = ok ? "#0a7a2f" : "#b00020";
+    statusPill.classList.toggle("bad", !ok);
   }
 
-  function renderMonthOptions(selected) {
-    monthSel.innerHTML = "";
-    for (const mk of store.monthOrder) {
-      const opt = document.createElement("option");
-      opt.value = mk;
-      opt.textContent = mk;
-      if (mk === selected) opt.selected = true;
-      monthSel.appendChild(opt);
-    }
+  function commit() {
+    persistLocalAndCloud();
+    renderAll();
   }
 
-  function renderTotal(mk) {
-    const month = store.months[mk];
-    let total = 0;
-    for (const r of month.rows) total += calcHours(r.start, r.end, r.lunch);
-    totalBox.textContent = `Total: ${fmt2(total)}`;
-  }
+  // ============================================================
+  //  Shared editor: Start/End tiles, duty chips, lunch stepper
+  // ============================================================
+  function makeEditor(root, getRow) {
+    root.innerHTML = `
+      <div class="tiles">
+        <label class="tile"><span class="lab">Start</span><span class="val"></span><input type="time" data-f="start" aria-label="Start time"></label>
+        <label class="tile"><span class="lab">End</span><span class="val"></span><input type="time" data-f="end" aria-label="End time"></label>
+      </div>
+      <div class="fields">
+        <div><div class="field-lab">Duty</div><div class="chips"></div></div>
+        <div><div class="field-lab">Lunch (hrs)</div>
+          <div class="stepper">
+            <button type="button" data-step="-1" aria-label="Less lunch">−</button>
+            <span class="v"></span>
+            <button type="button" data-step="1" aria-label="More lunch">+</button>
+          </div>
+        </div>
+      </div>`;
 
-  function renderTable(mk) {
-    const month = store.months[mk];
-    if (!month) return;
-    tbody.innerHTML = "";
-
-    month.rows.forEach((row) => {
-      const startNorm = normalizeTimeString(row.start);
-      const endNorm   = normalizeTimeString(row.end);
-      if (row.start !== startNorm) row.start = startNorm;
-      if (row.end !== endNorm) row.end = endNorm;
-
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td><input type="date" value="${row.date}"></td>
-        <td>${row.day}</td>
-        <td>
-          <select data-start>
-            ${TIME_OPTS.map(t => `<option value="${t}">${t}</option>`).join("")}
-          </select>
-        </td>
-        <td>
-          <select data-end>
-            ${TIME_OPTS.map(t => `<option value="${t}">${t}</option>`).join("")}
-          </select>
-        </td>
-        <td>
-          <select>${DUTIES.map(d => `<option ${d===row.duty?"selected":""}>${d}</option>`).join("")}</select>
-        </td>
-        <td><input type="number" step="0.25" min="0" value="${row.lunch ?? "0"}"></td>
-        <td class="num" data-hours>0.00</td>
-      `;
-
-      const dateEl  = tr.children[0].querySelector("input");
-      const startEl = tr.querySelector("[data-start]");
-      const endEl   = tr.querySelector("[data-end]");
-      const dutyEl  = tr.children[4].querySelector("select");
-      const lunchEl = tr.children[5].querySelector("input");
-      const hoursTd = tr.querySelector("[data-hours]");
-
-      // Bind values after options exist (handles non-standard times)
-      const ns = normalizeTimeString(row.start);
-      const ne = normalizeTimeString(row.end);
-      if (ns && !TIME_OPTS.includes(ns)) {
-        const o = document.createElement("option");
-        o.value = ns; o.textContent = ns;
-        startEl.appendChild(o);
-      }
-      if (ne && !TIME_OPTS.includes(ne)) {
-        const o = document.createElement("option");
-        o.value = ne; o.textContent = ne;
-        endEl.appendChild(o);
-      }
-      startEl.value = ns;
-      endEl.value = ne;
-
-      function syncDayFromDate() {
-        const d = new Date(dateEl.value + "T00:00:00");
-        row.day = weekdayShort(d);
-        tr.children[1].textContent = row.day;
-      }
-
-      function updateAndSave() {
-        const h = calcHours(row.start, row.end, row.lunch);
-        hoursTd.textContent = fmt2(h);
-        persistLocalAndCloud();
-        renderTotal(currentMonth);
-      }
-
-      hoursTd.textContent = fmt2(calcHours(row.start, row.end, row.lunch));
-
-      dateEl.addEventListener("change", () => {
-        row.date = dateEl.value;
-        syncDayFromDate();
-        updateAndSave();
+    const chips = root.querySelector(".chips");
+    for (const duty of DUTIES) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.textContent = duty;
+      b.dataset.duty = duty;
+      b.addEventListener("click", () => {
+        const row = getRow();
+        if (!row) return;
+        row.duty = row.duty === duty ? "" : duty;
+        commit();
       });
-      startEl.addEventListener("change", () => { row.start = startEl.value; updateAndSave(); });
-      endEl.addEventListener("change",   () => { row.end   = endEl.value;   updateAndSave(); });
-      dutyEl.addEventListener("change",  () => { row.duty  = dutyEl.value;  updateAndSave(); });
-      lunchEl.addEventListener("change", () => { row.lunch = lunchEl.value; updateAndSave(); });
+      chips.appendChild(b);
+    }
 
-      tbody.appendChild(tr);
-    });
+    const inputs = root.querySelectorAll('input[type="time"]');
+    for (const input of inputs) {
+      const apply = () => {
+        const row = getRow();
+        if (!row || normalizeTimeString(row[input.dataset.f]) === input.value) return;
+        row[input.dataset.f] = input.value;
+        commit();
+      };
+      input.addEventListener("input", apply);
+      input.addEventListener("change", apply);
+    }
 
-    renderTotal(mk);
+    for (const b of root.querySelectorAll("[data-step]")) {
+      b.addEventListener("click", () => {
+        const row = getRow();
+        if (!row) return;
+        const v = Number(row.lunch || 0) + Number(b.dataset.step) * 0.25;
+        row.lunch = String(Math.min(3, Math.max(0, v)));
+        commit();
+      });
+    }
+
+    return function render() {
+      const row = getRow();
+      if (!row) return;
+      for (const input of inputs) {
+        // Older rows may hold "8:15 AM"; the time input only takes "HH:MM".
+        // Normalize for display only, so data changes only where someone edits.
+        const v = normalizeTimeString(row[input.dataset.f]);
+        const val = input.previousElementSibling;
+        val.textContent = v || "--:--";
+        val.classList.toggle("empty", !v);
+        if (document.activeElement !== input && input.value !== v) input.value = v;
+      }
+      for (const b of chips.children) b.setAttribute("aria-pressed", String(row.duty === b.dataset.duty));
+      root.querySelector(".stepper .v").textContent = Number(row.lunch || 0);
+    };
   }
 
-  function addNextMonth(baseMk) {
-    const [yStr, mStr] = baseMk.split("-");
-    let y = Number(yStr), m = Number(mStr);
-    m += 1;
-    if (m === 13) { m = 1; y += 1; }
-    const nextMk = `${y}-${pad2(m)}`;
-    if (!store.months[nextMk]) {
-      store.months[nextMk] = makeBlankMonth(nextMk);
-      store.monthOrder.push(nextMk);
+  const renderTodayEditor = makeEditor($("todayEditor"), () => rowAt(todayLoc()));
+  const renderSheetEditor = makeEditor($("sheetEditor"), () => rowAt(sheetLoc));
+  // On the today card the big button sits right under the times; duty and lunch come after.
+  $("todayEditor").querySelector(".tiles").after(primaryBtn, doneLine);
+
+  // ============================================================
+  //  Render
+  // ============================================================
+  function sinceLabel(start) {
+    const d = new Date();
+    let mins = d.getHours() * 60 + d.getMinutes() - toMinutes(start);
+    if (mins < 0) mins += 24 * 60;
+    return `${Math.floor(mins / 60)}h ${pad2(mins % 60)}m so far`;
+  }
+
+  function renderToday() {
+    const d = new Date();
+    const row = rowAt(todayLoc());
+    const h = calcHours(row.start, row.end, row.lunch);
+    $("todayDate").textContent = `${weekdayShort(d)} ${d.getDate()} ${MONTH_NAMES[d.getMonth()].slice(0, 3)}`;
+    $("todayHours").textContent = row.start && row.end ? `${fmt2(h)} h` : "";
+    renderTodayEditor();
+
+    if (!row.start || !row.end) {
+      primaryBtn.hidden = false;
+      doneLine.hidden = true;
+      primaryBtn.querySelector("b").textContent = row.start ? "Finish work" : "Start work";
+      primaryBtn.querySelector("span").textContent = row.start
+        ? `now ${nowHHMM()} · ${sinceLabel(row.start)}`
+        : `now ${nowHHMM()}`;
+    } else {
+      primaryBtn.hidden = true;
+      doneLine.hidden = false;
+      doneLine.innerHTML = `Done for today · ${fmt2(h)} h<small>Tap a time above to correct it</small>`;
     }
-    return nextMk;
+  }
+
+  function renderMonth() {
+    if (!store.months[viewMonth]) viewMonth = monthKeyFromDate(new Date());
+    const month = store.months[viewMonth];
+    const [y, m] = viewMonth.split("-").map(Number);
+    const today = ymd(new Date());
+    $("monthName").textContent = `${MONTH_NAMES[m - 1]} ${y}`;
+
+    let total = 0, days = 0;
+    for (const r of month.rows) {
+      const h = calcHours(r.start, r.end, r.lunch);
+      total += h;
+      if (h > 0) days++;
+    }
+    $("monthTotal").textContent = fmt2(total);
+    $("monthDays").textContent = days;
+
+    // Newest first; days that haven't happened yet stay hidden.
+    dayList.innerHTML = "";
+    const shown = month.rows
+      .map((r, i) => ({ r, i }))
+      .filter(({ r }) => r.date <= today)
+      .reverse();
+    for (const { r, i } of shown) {
+      const d = new Date(r.date + "T00:00:00");
+      const h = calcHours(r.start, r.end, r.lunch);
+      const hasTimes = r.start || r.end;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "day" + (hasTimes ? "" : " off") + (r.date === today ? " is-today" : "");
+      b.innerHTML = `
+        <span class="d"><span class="wd">${weekdayShort(d)}</span><span class="n">${d.getDate()}</span></span>
+        <span><span class="span"></span><span class="duty"></span></span>
+        <span class="hrs">${h > 0 ? fmt2(h) : ""}</span>`;
+      const span = `${normalizeTimeString(r.start) || "--:--"} – ${normalizeTimeString(r.end) || "--:--"}`;
+      b.querySelector(".span").textContent = hasTimes ? span : "—";
+      b.querySelector(".duty").textContent = r.duty || "";
+      b.addEventListener("click", () => openSheet({ mk: viewMonth, i }));
+      dayList.appendChild(b);
+    }
+    if (!shown.length) dayList.innerHTML = `<div class="empty-list">No days yet this month.</div>`;
+
+    const order = sortedMonths();
+    const idx = order.indexOf(viewMonth);
+    $("prevMonth").disabled = idx <= 0;
+    $("nextMonth").disabled = idx >= order.length - 1;
+  }
+
+  function renderSheet() {
+    const row = rowAt(sheetLoc);
+    if (!row) return;
+    const d = new Date(row.date + "T00:00:00");
+    const h = calcHours(row.start, row.end, row.lunch);
+    $("sheetTitle").textContent = `${weekdayShort(d)} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+    $("sheetHours").textContent = h > 0 ? `${fmt2(h)} h` : "";
+    renderSheetEditor();
+  }
+
+  function renderAll() {
+    if (!store) return;
+    renderToday();
+    renderMonth();
+    renderSheet();
   }
 
   // ============================================================
@@ -599,9 +816,8 @@
       store = loadStore() || ensureInit();
     }
 
-    currentMonth = store.monthOrder[store.monthOrder.length - 1];
-    renderMonthOptions(currentMonth);
-    renderTable(currentMonth);
+    viewMonth = monthKeyFromDate(new Date());
+    renderAll();
     subscribeRemoteChanges();
   }
 
@@ -619,11 +835,7 @@
 
       store = remote;
       saveStore(store);
-      if (!store.monthOrder.includes(currentMonth)) {
-        currentMonth = store.monthOrder[store.monthOrder.length - 1];
-      }
-      renderMonthOptions(currentMonth);
-      renderTable(currentMonth);
+      renderAll();
       setStatus(true, "Updated from cloud");
     }, (err) => {
       setStatus(false, `Sync listener: ${err.code || err.message}`);
@@ -631,25 +843,78 @@
   }
 
   // ============================================================
-  //  Top-bar buttons (only active when signed in)
+  //  Today: one tap records the current time
   // ============================================================
-  monthSel.addEventListener("change", () => {
-    currentMonth = monthSel.value;
-    renderTable(currentMonth);
+  primaryBtn.addEventListener("click", () => {
+    const loc = todayLoc();
+    const row = rowAt(loc);
+    const field = row.start ? "end" : "start";
+    const before = row[field];
+    const t = nowHHMM();
+    row[field] = t;
+    commit();
+    toast(`${field === "start" ? "Started" : "Finished"} at ${t}`, () => {
+      const r = rowAt(loc);
+      if (!r) return;
+      r[field] = before;
+      commit();
+    });
   });
 
-  newMonthBtn.addEventListener("click", () => {
-    currentMonth = addNextMonth(currentMonth);
-    renderMonthOptions(currentMonth);
-    renderTable(currentMonth);
-    persistLocalAndCloud();
-    setStatus(true, "Created");
+  // ============================================================
+  //  Month list and day sheet
+  // ============================================================
+  $("prevMonth").addEventListener("click", () => {
+    const order = sortedMonths();
+    const idx = order.indexOf(viewMonth);
+    if (idx > 0) { viewMonth = order[idx - 1]; renderMonth(); }
   });
+  $("nextMonth").addEventListener("click", () => {
+    const order = sortedMonths();
+    const idx = order.indexOf(viewMonth);
+    if (idx < order.length - 1) { viewMonth = order[idx + 1]; renderMonth(); }
+  });
+
+  function openSheet(loc) {
+    sheetLoc = loc;
+    renderSheet();
+    sheet.showModal();
+  }
+  $("sheetDoneBtn").addEventListener("click", () => sheet.close());
+  sheet.addEventListener("close", () => { sheetLoc = null; });
+
+  $("clearDayBtn").addEventListener("click", () => {
+    const loc = sheetLoc;
+    const row = rowAt(loc);
+    if (!row) return;
+    const before = { start: row.start, end: row.end, duty: row.duty, lunch: row.lunch };
+    Object.assign(row, { start: "", end: "", duty: "", lunch: "0.5" });
+    sheet.close();
+    commit();
+    toast("Day cleared", () => {
+      const r = rowAt(loc);
+      if (!r) return;
+      Object.assign(r, before);
+      commit();
+    });
+  });
+
+  // Tap on the dimmed backdrop closes a sheet.
+  for (const dlg of [sheet, menu]) {
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+  }
+
+  // ============================================================
+  //  Menu
+  // ============================================================
+  $("menuBtn").addEventListener("click", () => menu.showModal());
+  $("menuCloseBtn").addEventListener("click", () => menu.close());
 
   exportBtn.addEventListener("click", async () => {
-    const data = store.months[currentMonth];
-    const blob = new Blob([JSON.stringify({ month: currentMonth, ...data }, null, 2)], { type: "application/json" });
-    const fileName = `timesheet-${currentMonth}.json`;
+    menu.close();
+    const data = store.months[viewMonth];
+    const blob = new Blob([JSON.stringify({ month: viewMonth, ...data }, null, 2)], { type: "application/json" });
+    const fileName = `timesheet-${viewMonth}.json`;
     if (navigator.share) {
       try {
         await navigator.share({ title: fileName, text: "Timesheet export", files: [new File([blob], fileName, { type: "application/json" })] });
@@ -667,12 +932,56 @@
   });
 
   resetBtn.addEventListener("click", () => {
-    if (!confirm(`Reset ${currentMonth} data?`)) return;
-    store.months[currentMonth] = makeBlankMonth(currentMonth);
-    persistLocalAndCloud();
-    renderTable(currentMonth);
-    setStatus(true, "Reset");
+    menu.close();
+    const mk = viewMonth;
+    const [y, m] = mk.split("-").map(Number);
+    if (!confirm(`Clear every day in ${MONTH_NAMES[m - 1]} ${y}?`)) return;
+    const before = store.months[mk];
+    store.months[mk] = makeBlankMonth(mk);
+    commit();
+    toast("Month cleared", () => {
+      store.months[mk] = before;
+      commit();
+    });
   });
+
+  // ============================================================
+  //  Toast with undo
+  // ============================================================
+  let toastTimer = null;
+  function toast(message, undo) {
+    const el = $("toast");
+    el.innerHTML = "";
+    const span = document.createElement("span");
+    span.textContent = message;
+    el.appendChild(span);
+    el.classList.toggle("has-undo", Boolean(undo));
+    if (undo) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = "Undo";
+      b.addEventListener("click", () => { hideToast(); undo(); });
+      el.appendChild(b);
+    }
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 6000);
+  }
+  function hideToast() { $("toast").classList.remove("show"); }
+
+  // Keep "now 08:07" honest, and roll over to a new day at midnight.
+  let lastDay = ymd(new Date());
+  setInterval(() => {
+    if (!store) return;
+    const d = ymd(new Date());
+    if (d !== lastDay) {
+      lastDay = d;
+      viewMonth = monthKeyFromDate(new Date());
+      renderAll();
+    } else {
+      renderToday();
+    }
+  }, 10000);
 
   // ============================================================
   //  Auth UI
@@ -683,6 +992,9 @@
   function clearLoginError() { loginErr.textContent = ""; }
 
   function showLogin() {
+    if (sheet.open) sheet.close();
+    if (menu.open) menu.close();
+    hideToast();
     loginScreen.classList.remove("hidden");
     appScreen.classList.add("hidden");
     passwordInput.value = "";
@@ -765,6 +1077,7 @@
   });
 
   signOutBtn.addEventListener("click", async () => {
+    menu.close();
     if (unsubscribeSnap) { unsubscribeSnap(); unsubscribeSnap = null; }
     await signOut(auth);
   });
@@ -784,7 +1097,8 @@
       currentUser = null;
       userDocRef = null;
       store = null;
-      currentMonth = null;
+      viewMonth = null;
+      sheetLoc = null;
       if (unsubscribeSnap) { unsubscribeSnap(); unsubscribeSnap = null; }
       showLogin();
       return;

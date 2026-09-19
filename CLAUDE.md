@@ -5,8 +5,10 @@ This is a small personal **Timesheet PWA**. See `README.md` for the user-facing 
 ## Shape
 
 - Single-file vanilla JS app at `docs/index.html` (HTML, inline CSS, ESM `<script type="module">` — no build step, no frameworks).
-- Service worker at `docs/sw.js`. Cache name is `timesheet-v3` and **must be bumped on every shipped change to `docs/`**, otherwise installed PWAs serve a stale shell.
+- Service worker at `docs/sw.js`. Cache name is `timesheet-v4` and **must be bumped on every shipped change to `docs/`**, otherwise installed PWAs serve a stale shell.
 - PWA manifest at `docs/manifest.webmanifest`. Icons in `docs/icons/`.
+- The daily user only uses a phone. The UI is a Today card (one-tap Start/Finish), a month list, and a bottom-sheet day editor.
+- Time fields are native `<input type="time">` elements laid transparently over the big time text, so a tap opens the phone's picker. On desktop this means no visible picker or caret.
 - Firestore rules at `firestore.rules`, configured by `firebase.json` and bound to project `timesheet-pwa-b30e2` in `.firebaserc`.
 - Hosted on GitHub Pages from the `docs/` folder. No CI, no other tooling.
 
@@ -43,7 +45,7 @@ Edit BOTH places — they must match or sign-in succeeds but data access fails:
 2. `isAllowed()` function in `firestore.rules`, then deploy with `firebase deploy --only firestore:rules`.
 
 ### Change anything in `docs/`
-Bump the cache name in `docs/sw.js` (`timesheet-v3` → `v4` etc.) in the same commit.
+Bump the cache name in `docs/sw.js` (`timesheet-v4` → `v5` etc.) in the same commit.
 
 ### Change the data shape
 The per-user doc shape is `{ months: { [yyyy-mm]: { rows: [...] } }, monthOrder: [...], email, updatedAt }`. The same shape is mirrored in `localStorage` under key `timesheet:v1`. Keep both in sync.

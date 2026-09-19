@@ -6,7 +6,9 @@ Live URL: <https://wangylhs.github.io/my-pwa/>
 
 ## Features
 
-- Per-month timesheet with Start / End / Duty / Lunch fields and auto-calculated hours.
+- Phone-first layout: a Today card where one tap records the start or finish time to the minute, with undo.
+- Times are corrected with the phone's own time picker; duty and lunch are one-tap buttons.
+- Per-month list of days with auto-calculated hours; tap a day to edit it. New months are created automatically.
 - Works offline once installed; edits queue up and sync when back online.
 - Sign in with **email + password** or **Google**. Both methods land on the same data (keyed by email).
 - Cross-device sync via Firestore — same email, same data on every device.
@@ -18,7 +20,7 @@ Live URL: <https://wangylhs.github.io/my-pwa/>
 ```
 docs/                         <- served by GitHub Pages
   index.html                  <- entire app: HTML, styles, ESM script
-  sw.js                       <- service worker (cache name: timesheet-v3)
+  sw.js                       <- service worker (cache name: timesheet-v4)
   manifest.webmanifest        <- PWA manifest
   icons/
     icon-192.png
@@ -81,7 +83,7 @@ python3 -m http.server 8000
 
 `localhost` is already on Firebase Auth's authorized domains by default, so sign-in works locally without extra setup.
 
-When you change `index.html` or `sw.js`, bump the cache name in `sw.js` (`timesheet-v3` → `v4`, etc.) so installed PWAs pick up the new shell.
+When you change `index.html` or `sw.js`, bump the cache name in `sw.js` (`timesheet-v4` → `v5`, etc.) so installed PWAs pick up the new shell.
 
 ## Deployment
 
