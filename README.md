@@ -20,7 +20,7 @@ Live URL: <https://wangylhs.github.io/my-pwa/>
 ```
 docs/                         <- served by GitHub Pages
   index.html                  <- entire app: HTML, styles, ESM script
-  sw.js                       <- service worker (cache name: timesheet-v4)
+  sw.js                       <- service worker (cache name: timesheet-v5)
   manifest.webmanifest        <- PWA manifest
   icons/
     icon-192.png
@@ -83,7 +83,7 @@ python3 -m http.server 8000
 
 `localhost` is already on Firebase Auth's authorized domains by default, so sign-in works locally without extra setup.
 
-When you change `index.html` or `sw.js`, bump the cache name in `sw.js` (`timesheet-v4` → `v5`, etc.) so installed PWAs pick up the new shell.
+When you change `index.html` or `sw.js`, bump the cache name in `sw.js` (`timesheet-v5` → `v6`, etc.) so installed PWAs pick up the new shell.
 
 ## Deployment
 

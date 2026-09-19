@@ -118,6 +118,23 @@
       font-size: 16px;
       -webkit-appearance: none; appearance: none;
     }
+    /* With a mouse there is no phone picker to open, so show the real input:
+       its caret and segment highlight mark where typing goes, and its clock
+       icon opens the browser's picker. Touch screens keep the overlay above. */
+    @media (pointer: fine) {
+      .tile .val { display: none; }
+      .tile input {
+        position: static;
+        width: 100%; height: auto;
+        opacity: 1;
+        -webkit-appearance: auto; appearance: auto;
+        background: transparent; color: var(--text);
+        font-family: inherit; font-size: 26px; font-weight: 600; line-height: 1.15;
+        font-variant-numeric: tabular-nums;
+      }
+      .tile input:focus { outline: none; }
+      .tile:focus-within { box-shadow: inset 0 0 0 2px var(--accent); }
+    }
 
     .primary {
       width: 100%; margin-top: 12px; min-height: 68px;
