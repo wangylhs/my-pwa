@@ -8,7 +8,8 @@ service cloud.firestore {
     function isAllowed(email) {
       return email in [
         'wangylhs2@gmail.com',
-        'nomi4458898@gmail.com'
+        'nomi4458898@gmail.com',
+        'guiyingma14@gmail.com'
       ];
     }
 
